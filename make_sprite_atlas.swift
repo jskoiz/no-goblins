@@ -141,14 +141,82 @@ func makeFrameSequence(crops: [Crop], sourceDir: URL, destinationDir: URL, mode:
     }
 }
 
+func makeGridAtlas(crops: [Crop], sourceDir: URL, destination: URL, columns: Int, mode: MaskMode) throws {
+    guard let first = crops.first else { return }
+    let frameW = first.w
+    let frameH = first.h
+    let rows = Int(ceil(Double(crops.count) / Double(columns)))
+    let sheetW = frameW * columns
+    let sheetH = frameH * rows
+    var output = [UInt8](repeating: 0, count: sheetW * sheetH * 4)
+    var cache: [String: (pixels: [UInt8], width: Int, height: Int, bytesPerRow: Int)] = [:]
+
+    for (frameIndex, crop) in crops.enumerated() {
+        if cache[crop.source] == nil {
+            cache[crop.source] = try loadRGBA(sourceDir.appendingPathComponent(crop.source))
+        }
+        guard let image = cache[crop.source] else { continue }
+
+        let column = frameIndex % columns
+        let row = frameIndex / columns
+
+        for yy in 0..<crop.h {
+            for xx in 0..<crop.w {
+                let sx = crop.x + xx
+                let sy = crop.y + yy
+                guard sx >= 0, sx < image.width, sy >= 0, sy < image.height else { continue }
+                let si = sy * image.bytesPerRow + sx * 4
+                let r = Int(image.pixels[si])
+                let g = Int(image.pixels[si + 1])
+                let b = Int(image.pixels[si + 2])
+                let a = alphaFor(r, g, b, mode: mode)
+                guard a > 0 else { continue }
+
+                let dx = column * frameW + xx
+                let dy = row * frameH + yy
+                let di = (dy * sheetW + dx) * 4
+                output[di] = UInt8(r)
+                output[di + 1] = UInt8(g)
+                output[di + 2] = UInt8(b)
+                output[di + 3] = a
+            }
+        }
+    }
+
+    guard let provider = CGDataProvider(data: Data(output) as CFData),
+          let cgImage = CGImage(
+            width: sheetW,
+            height: sheetH,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: sheetW * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+          ),
+          let destinationRef = CGImageDestinationCreateWithURL(destination as CFURL, UTType.png.identifier as CFString, 1, nil)
+    else {
+        throw NSError(domain: "sprites", code: 4)
+    }
+
+    CGImageDestinationAddImage(destinationRef, cgImage, nil)
+    CGImageDestinationFinalize(destinationRef)
+}
+
 let frameDir = URL(fileURLWithPath: "frames", isDirectory: true)
 let riveFrameDir = URL(fileURLWithPath: "rive_frames", isDirectory: true)
 let outDir = URL(fileURLWithPath: "sprites", isDirectory: true)
 try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
-let frameNames = (0..<24).map { String(format: "frame_%02d.png", $0) }
-let frogCrops = frameNames.map { Crop(source: $0, x: 450, y: 500, w: 360, h: 220) }
-try makeSheet(crops: frogCrops, sourceDir: frameDir, destination: outDir.appendingPathComponent("frog_sheet.png"), mode: .frogAndTongue)
+let hasLegacyFrames = FileManager.default.fileExists(atPath: frameDir.path)
+if hasLegacyFrames {
+    let frameNames = (0..<24).map { String(format: "frame_%02d.png", $0) }
+    let frogCrops = frameNames.map { Crop(source: $0, x: 450, y: 500, w: 360, h: 220) }
+    try makeSheet(crops: frogCrops, sourceDir: frameDir, destination: outDir.appendingPathComponent("frog_sheet.png"), mode: .frogAndTongue)
+}
 
 if FileManager.default.fileExists(atPath: riveFrameDir.path) {
     let riveFrameNames = (try FileManager.default.contentsOfDirectory(atPath: riveFrameDir.path))
@@ -163,11 +231,119 @@ if FileManager.default.fileExists(atPath: riveFrameDir.path) {
     )
 }
 
-let flyCrops = [
-    Crop(source: "frame_00.png", x: 570, y: 140, w: 150, h: 90),
-    Crop(source: "frame_05.png", x: 650, y: 120, w: 150, h: 90),
-]
-try makeSheet(crops: flyCrops, sourceDir: frameDir, destination: outDir.appendingPathComponent("fly_sheet.png"), mode: .fly)
+let dedupedRiveFrameDir = outDir.appendingPathComponent("rive_frog_frames_deduped", isDirectory: true)
+let hasDedupedFrames = FileManager.default.fileExists(atPath: dedupedRiveFrameDir.path)
+if hasDedupedFrames {
+    let dedupedFrameNames = (try FileManager.default.contentsOfDirectory(atPath: dedupedRiveFrameDir.path))
+        .filter { $0.hasPrefix("frame_") && $0.hasSuffix(".png") }
+        .sorted()
+    let atlasCrops = dedupedFrameNames.map { Crop(source: $0, x: 0, y: 0, w: 360, h: 360) }
+    try makeGridAtlas(
+        crops: atlasCrops,
+        sourceDir: dedupedRiveFrameDir,
+        destination: outDir.appendingPathComponent("frog_atlas.png"),
+        columns: 20,
+        mode: .frogAndTongue
+    )
+
+    let frogManifest = """
+    {
+      "source": "OpenAI DevDay frog frames derived from froge-loop.riv",
+      "image": "sprites/frog_atlas.png",
+      "frameWidth": 360,
+      "frameHeight": 360,
+      "columns": 20,
+      "frames": \(dedupedFrameNames.count),
+      "scale": 1.18,
+      "mouthOffset": { "x": 136, "y": 196 },
+      "tongueAnchor": { "x": 136, "y": 254 },
+      "tongueAnchors": {
+        "left": { "x": 98, "y": 248 },
+        "right": { "x": 174, "y": 248 },
+        "up": { "x": 136, "y": 214 },
+        "down": { "x": 136, "y": 270 }
+      },
+      "tongueTips": {
+        "attackLeft": { "x": 8, "y": 248 },
+        "attackRight": { "x": 310, "y": 248 },
+        "attackUp": { "x": 136, "y": 34 }
+      },
+      "tongueMasks": {
+        "attackLeft": { "x": 0, "y": 224, "w": 112, "h": 54 },
+        "attackRight": { "x": 174, "y": 224, "w": 172, "h": 54 },
+        "attackUp": { "x": 104, "y": 30, "w": 92, "h": 202 }
+      },
+      "eyeGlowAnchors": [
+        { "x": 96, "y": 190 },
+        { "x": 176, "y": 190 }
+      ],
+      "animations": {
+        "idle": {
+          "frames": [23],
+          "fps": 6,
+          "loop": true,
+          "notes": "True resting hold identified from long deduped source holds. No tongue or chew frames."
+        },
+        "idleBlink": {
+          "frames": [20, 21, 22, 23],
+          "fps": 10,
+          "loop": false
+        },
+        "attackRight": {
+          "frames": [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54],
+          "fps": 30,
+          "notes": "Authored right-facing orange glyph tongue from extracted source frames.",
+          "loop": false
+        },
+        "attackLeft": {
+          "frames": [55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90],
+          "fps": 30,
+          "notes": "Authored left-facing orange glyph tongue from extracted source frames.",
+          "loop": false
+        },
+        "attackUp": {
+          "frames": [91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115],
+          "fps": 30,
+          "notes": "Authored upward orange glyph tongue from extracted source frames.",
+          "loop": false
+        },
+        "attackHorizontal": {
+          "frames": [24, 24, 25, 25],
+          "fps": 18,
+          "notes": "Tongue-free fallback anticipation for off-axis dynamic tongue.",
+          "loop": false
+        },
+        "attackVertical": {
+          "frames": [91, 91, 92, 92],
+          "fps": 18,
+          "notes": "Tongue-free fallback anticipation for off-axis dynamic tongue.",
+          "loop": false
+        },
+        "catchChew": {
+          "frames": [116, 120, 136, 140, 141, 142, 143, 144, 145, 146, 147, 148, 23],
+          "fps": 14,
+          "loop": false,
+          "notes": "Success chew/swallow follow-through only. Never used as idle."
+        },
+        "missRecover": {
+          "frames": [54, 23],
+          "fps": 14,
+          "notes": "Quick tongue-free return from strike hold to rest.",
+          "loop": false
+        }
+      }
+    }
+    """
+    try frogManifest.write(to: outDir.appendingPathComponent("frog_manifest.json"), atomically: true, encoding: .utf8)
+}
+
+if hasLegacyFrames {
+    let flyCrops = [
+        Crop(source: "frame_00.png", x: 570, y: 140, w: 150, h: 90),
+        Crop(source: "frame_05.png", x: 650, y: 120, w: 150, h: 90),
+    ]
+    try makeSheet(crops: flyCrops, sourceDir: frameDir, destination: outDir.appendingPathComponent("fly_sheet.png"), mode: .fly)
+}
 
 let manifest = """
 {
@@ -203,5 +379,10 @@ let manifest = """
   }
 }
 """
-try manifest.write(to: outDir.appendingPathComponent("manifest.json"), atomically: true, encoding: .utf8)
-print("wrote sprites/frog_sheet.png, sprites/fly_sheet.png, sprites/manifest.json")
+if hasLegacyFrames {
+    try manifest.write(to: outDir.appendingPathComponent("manifest.json"), atomically: true, encoding: .utf8)
+    print("wrote sprites/frog_sheet.png, sprites/fly_sheet.png, sprites/manifest.json")
+}
+if hasDedupedFrames {
+    print("wrote sprites/frog_atlas.png, sprites/frog_manifest.json")
+}

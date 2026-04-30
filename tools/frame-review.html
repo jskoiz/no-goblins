@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frog Frame Review</title>
+  <link rel="icon" href="data:,">
+  <style>
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: #000;
+      color: #63ef42;
+      font: 14px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 24px;
+      padding: 24px;
+    }
+    canvas {
+      width: min(76vw, 720px);
+      height: min(76vw, 720px);
+      image-rendering: pixelated;
+      background: #020402;
+      border: 1px solid rgba(99, 239, 66, 0.28);
+    }
+    aside {
+      display: grid;
+      align-content: start;
+      gap: 12px;
+    }
+    button, input {
+      min-height: 34px;
+      border: 1px solid rgba(99, 239, 66, 0.34);
+      background: #050705;
+      color: #63ef42;
+      font: inherit;
+    }
+    button:hover {
+      border-color: #3298ff;
+      color: #3298ff;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+      border: 1px solid rgba(99, 239, 66, 0.34);
+      background: #050705;
+      color: #eeeeec;
+      font: inherit;
+      padding: 10px;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .row > * {
+      flex: 1;
+    }
+    .stat {
+      color: #eeeeec;
+      font-size: 18px;
+    }
+    @media (max-width: 860px) {
+      body {
+        grid-template-columns: 1fr;
+      }
+      canvas {
+        width: calc(100vw - 48px);
+        height: calc(100vw - 48px);
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <canvas id="preview" width="360" height="360"></canvas>
+  </main>
+  <aside>
+    <div class="stat">Frame: <span id="frameNumber">0</span> / <span id="frameTotal">0</span></div>
+    <input id="scrubber" type="range" min="0" max="0" value="0">
+    <div class="row">
+      <button id="previous">previous</button>
+      <button id="next">next</button>
+    </div>
+    <div class="row">
+      <button id="play">play range</button>
+      <button id="stop">stop</button>
+    </div>
+    <div class="row">
+      <button id="startRange">start range</button>
+      <button id="endRange">end range</button>
+    </div>
+    <label>Animation name</label>
+    <input id="animationName" value="idle">
+    <textarea id="json" spellcheck="false"></textarea>
+    <button id="copyJson">copy JSON</button>
+  </aside>
+
+  <script>
+    const canvas = document.getElementById("preview");
+    const ctx = canvas.getContext("2d");
+    const image = new Image();
+    const frameNumber = document.getElementById("frameNumber");
+    const frameTotal = document.getElementById("frameTotal");
+    const scrubber = document.getElementById("scrubber");
+    const animationName = document.getElementById("animationName");
+    const output = document.getElementById("json");
+
+    let manifest = null;
+    let frame = 0;
+    let rangeStart = 0;
+    let rangeEnd = 0;
+    let playing = false;
+    let last = 0;
+
+    function rangeFrames() {
+      const start = Math.min(rangeStart, rangeEnd);
+      const end = Math.max(rangeStart, rangeEnd);
+      return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+    }
+
+    function updateJson() {
+      output.value = JSON.stringify({
+        [animationName.value || "animationName"]: {
+          frames: rangeFrames(),
+          fps: 18,
+          loop: false,
+        },
+      }, null, 2);
+    }
+
+    function draw() {
+      if (!manifest || !image.complete) return;
+      const sx = (frame % manifest.columns) * manifest.frameWidth;
+      const sy = Math.floor(frame / manifest.columns) * manifest.frameHeight;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(image, sx, sy, manifest.frameWidth, manifest.frameHeight, 0, 0, canvas.width, canvas.height);
+      frameNumber.textContent = String(frame);
+      scrubber.value = String(frame);
+      updateJson();
+    }
+
+    function setFrame(nextFrame) {
+      frame = Math.max(0, Math.min(manifest.frames - 1, nextFrame));
+      draw();
+    }
+
+    function tick(now) {
+      if (playing && now - last > 1000 / 18) {
+        last = now;
+        const start = Math.min(rangeStart, rangeEnd);
+        const end = Math.max(rangeStart, rangeEnd);
+        setFrame(frame >= end ? start : frame + 1);
+      }
+      requestAnimationFrame(tick);
+    }
+
+    document.getElementById("previous").addEventListener("click", () => setFrame(frame - 1));
+    document.getElementById("next").addEventListener("click", () => setFrame(frame + 1));
+    document.getElementById("play").addEventListener("click", () => { playing = true; setFrame(Math.min(rangeStart, rangeEnd)); });
+    document.getElementById("stop").addEventListener("click", () => { playing = false; });
+    document.getElementById("startRange").addEventListener("click", () => { rangeStart = frame; updateJson(); });
+    document.getElementById("endRange").addEventListener("click", () => { rangeEnd = frame; updateJson(); });
+    document.getElementById("copyJson").addEventListener("click", () => navigator.clipboard.writeText(output.value));
+    scrubber.addEventListener("input", () => setFrame(Number(scrubber.value)));
+    animationName.addEventListener("input", updateJson);
+
+    fetch("../sprites/frog_manifest.json")
+      .then((response) => response.json())
+      .then((data) => {
+        manifest = data;
+        frameTotal.textContent = String(manifest.frames - 1);
+        scrubber.max = String(manifest.frames - 1);
+        image.src = `../${manifest.image}`;
+        image.onload = draw;
+        requestAnimationFrame(tick);
+      });
+  </script>
+</body>
+</html>

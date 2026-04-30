@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Froge Fly Catch</title>
+  <link rel="icon" href="data:,">
   <style>
     @font-face {
       font-family: "OpenAI Sans";
@@ -42,7 +43,7 @@
       --fg: #7a7a7a;
       --frog: #63ef42;
       --fly: #44a6ff;
-      --tongue: #63ef42;
+      --tongue: #ff8a00;
       --blue: #3298ff;
       --text: #eeeeec;
       --muted: #85868c;
@@ -59,22 +60,33 @@
       height: 100vh;
       background: var(--bg);
       color: var(--fg);
-      font-family: "OpenAI Sans", ui-sans-serif, system-ui, sans-serif;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       overflow: hidden;
+      touch-action: none;
+      user-select: none;
     }
 
     main {
       width: 100vw;
       height: 100vh;
-      padding: 0;
+      padding: 12px;
+      display: grid;
+      place-items: start center;
     }
 
     .stage {
-      position: fixed;
-      inset: 0;
+      position: relative;
+      width: min(calc(100vw - 24px), calc((100vh - 24px) * 1.6));
+      height: min(calc(100vh - 24px), calc((100vw - 24px) / 1.6));
       background:
         radial-gradient(circle at 30% 30%, rgb(70 239 58 / 0.035), transparent 28%),
         #000;
+      border: 1px solid rgba(99, 239, 66, 0.18);
+      border-radius: clamp(14px, 2vmin, 28px);
+      overflow: hidden;
+      box-shadow:
+        inset 0 0 46px rgb(70 239 58 / 0.055),
+        inset 0 0 1px rgb(70 239 58 / 0.16);
     }
 
     canvas {
@@ -92,22 +104,23 @@
     }
 
     .footer-ui {
-      position: fixed;
-      left: clamp(24px, 3vw, 44px);
-      right: clamp(24px, 3vw, 44px);
-      bottom: clamp(12px, 1.8vh, 18px);
+      position: absolute;
+      left: clamp(30px, 4vmin, 58px);
+      right: clamp(30px, 4vmin, 58px);
+      bottom: clamp(22px, 4vmin, 48px);
       z-index: 2;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 16px;
-      color: var(--muted);
-      font-size: clamp(12px, 1.05vw, 15px);
+      color: #5f8c45;
+      font-size: clamp(11px, 1.35vmin, 16px);
       font-weight: 500;
       line-height: 1.15;
       letter-spacing: 0;
       pointer-events: none;
       user-select: none;
+      text-shadow: 0 0 10px rgb(99 239 66 / 0.42);
     }
 
     .footer-ui a {
@@ -120,31 +133,44 @@
     }
 
     .footer-ui a {
-      color: var(--muted);
+      color: #5f8c45;
       text-decoration: none;
       pointer-events: auto;
     }
 
     .footer-ui a:hover {
-      color: var(--text);
+      color: #6f9f50;
     }
 
     .footer-ui .accent {
-      color: var(--blue);
+      color: #6f9f50;
     }
 
     .footer-links {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
       white-space: nowrap;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 640px) {
       .footer-ui {
-        align-items: flex-start;
-        flex-direction: column;
+        left: 18px;
+        right: 18px;
+        bottom: 14px;
+        align-items: center;
+        flex-direction: row;
+        gap: 10px;
+        font-size: 11px;
+      }
+
+      .footer-links {
         gap: 8px;
+      }
+
+      .stage {
+        width: calc(100vw - 24px);
+        height: min(calc(100vh - 24px), 720px);
       }
     }
 
@@ -160,13 +186,13 @@
   <main>
     <div class="stage">
       <canvas id="game" width="1536" height="900" tabindex="0" aria-label="ASCII frog fly catching game"></canvas>
-    </div>
-    <div class="footer-ui" aria-label="game links and controls">
-      <span class="footer-controls">click anywhere to catch · press <span class="accent">r</span> to reset</span>
-      <span class="footer-links">
-        <a href="https://x.com/jskoiz" target="_blank" rel="noopener noreferrer">by <span class="accent">@jskoiz</span></a>
-        <a href="#github">github</a>
-      </span>
+      <div class="footer-ui" aria-label="game links and controls">
+        <span class="footer-controls">click flies to catch · press <span class="accent">r</span> to reset</span>
+        <span class="footer-links">
+          <a href="https://x.com/jskoiz" target="_blank" rel="noopener noreferrer">by <span class="accent">@jskoiz</span></a>
+          <a href="#github">github</a>
+        </span>
+      </div>
     </div>
   </main>
 
@@ -176,6 +202,26 @@
     const footer = document.querySelector(".footer-ui");
 
     const VIRTUAL = { width: 1536, height: 900 };
+    const COLORS = {
+      bg: "#000000",
+      frog: "#63ef42",
+      hudGreen: "#6b9e4f",
+      hudDim: "#385f2f",
+      hudNumber: "#6f9f50",
+      frogDim: "rgba(99, 239, 66, 0.42)",
+      fly: "#44a6ff",
+      blue: "#3298ff",
+      tongue: "#ff8a00",
+      text: "#eeeeec",
+      muted: "#85868c",
+      darkGreen: "rgba(99, 239, 66, 0.16)",
+    };
+    const HUD = { x: 58, y: 54, labelSize: 15, scoreSize: 34, timerSize: 17 };
+    const GAME_STATE = { ATTRACT: "attract", PLAYING: "playing", ROUND_OVER: "roundOver" };
+    const ROUND = { durationMs: 30000, initialFlyCount: 2, maxFlyCount: 5, addFlyEveryMs: 8000 };
+    const TONGUE = { extendMs: 150, holdMs: 95, retractMs: 155, cooldownMs: 180 };
+    const LEADERBOARD_ENABLED = false;
+
     const viewport = {
       width: VIRTUAL.width,
       height: VIRTUAL.height,
@@ -185,28 +231,51 @@
       offsetX: 0,
       offsetY: 0,
       footerReserve: 70,
+      portraitStage: false,
     };
 
-    const COLORS = {
-      bg: "#000000",
-      frog: "#63ef42",
-      fly: "#44a6ff",
-      tongue: "#63ef42",
-      text: "#eeeeec",
-      muted: "#85868c",
-      blue: "#3298ff",
-    };
-
-    const sprites = {
-      frog: {
-        image: new Image(),
-        frameWidth: 360,
-        frameHeight: 220,
-        frames: 24,
-        mouthOffset: { x: 190, y: 103 },
-        scale: 1.05,
-        attackFrame: 5,
+    const defaultFrogManifest = {
+      image: "sprites/frog_atlas.png",
+      frameWidth: 360,
+      frameHeight: 360,
+      columns: 20,
+      frames: 436,
+      scale: 1.18,
+      mouthOffset: { x: 136, y: 196 },
+      tongueAnchor: { x: 136, y: 254 },
+      tongueAnchors: {
+        left: { x: 98, y: 248 },
+        right: { x: 174, y: 248 },
+        up: { x: 136, y: 214 },
+        down: { x: 136, y: 270 },
       },
+      tongueTips: {
+        attackLeft: { x: 8, y: 248 },
+        attackRight: { x: 310, y: 248 },
+        attackUp: { x: 136, y: 34 },
+      },
+      tongueMasks: {
+        attackLeft: { x: 0, y: 224, w: 112, h: 54 },
+        attackRight: { x: 174, y: 224, w: 172, h: 54 },
+        attackUp: { x: 104, y: 30, w: 92, h: 202 },
+      },
+      eyeGlowAnchors: [{ x: 96, y: 190 }, { x: 176, y: 190 }],
+      animations: {
+        idle: { frames: [23], fps: 6, loop: true },
+        idleBlink: { frames: [20, 21, 22, 23], fps: 10, loop: false },
+        attackRight: { frames: [26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54], fps: 30, loop: false },
+        attackLeft: { frames: [55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90], fps: 30, loop: false },
+        attackUp: { frames: [91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115], fps: 30, loop: false },
+        attackHorizontal: { frames: [24, 24, 25, 25], fps: 18, loop: false },
+        attackVertical: { frames: [91, 91, 92, 92], fps: 18, loop: false },
+        catchChew: { frames: [116, 120, 136, 140, 141, 142, 143, 144, 145, 146, 147, 148, 23], fps: 14, loop: false },
+        missRecover: { frames: [54, 23], fps: 14, loop: false },
+      },
+    };
+
+    let frogManifest = defaultFrogManifest;
+    const sprites = {
+      frog: { image: new Image() },
       fly: {
         image: new Image(),
         frameWidth: 150,
@@ -215,8 +284,8 @@
         scale: 0.82,
       },
     };
-
-    sprites.frog.image.src = "sprites/frog_sheet.png";
+    const maskedFrogFrames = new Map();
+    let pixelTongueMaskUnavailable = false;
     sprites.fly.image.src = "sprites/fly_sheet.png";
 
     function resizeCanvas() {
@@ -224,17 +293,24 @@
       viewport.width = Math.max(1, rect.width);
       viewport.height = Math.max(1, rect.height);
       viewport.dpr = Math.min(2, window.devicePixelRatio || 1);
-      viewport.scale = viewport.width / VIRTUAL.width;
-      viewport.virtualHeight = Math.max(
-        VIRTUAL.height,
-        viewport.height / viewport.scale
-      );
-      viewport.offsetX = 0;
-      viewport.offsetY = 0;
+      viewport.portraitStage = viewport.width < 700 && viewport.height > viewport.width * 1.2;
+      viewport.scale = viewport.portraitStage
+        ? viewport.width / VIRTUAL.width
+        : Math.min(
+            viewport.width / VIRTUAL.width,
+            viewport.height / VIRTUAL.height
+          );
+      viewport.virtualHeight = viewport.portraitStage
+        ? Math.max(VIRTUAL.height, viewport.height / viewport.scale)
+        : VIRTUAL.height;
+      viewport.offsetX = (viewport.width - VIRTUAL.width * viewport.scale) / 2;
+      viewport.offsetY = viewport.portraitStage
+        ? 0
+        : (viewport.height - VIRTUAL.height * viewport.scale) / 2;
       const footerRect = footer.getBoundingClientRect();
       const footerStyles = getComputedStyle(footer);
       const footerBottom = parseFloat(footerStyles.bottom) || 0;
-      viewport.footerReserve = (footerRect.height + footerBottom + 52) / viewport.scale;
+      viewport.footerReserve = Math.min(92, (footerRect.height + footerBottom + 24) / viewport.scale);
 
       const nextWidth = Math.round(viewport.width * viewport.dpr);
       const nextHeight = Math.round(viewport.height * viewport.dpr);
@@ -263,46 +339,75 @@
 
     const FROG_HOME = { x: 768 };
     const grassClusters = [120, 345, 640, 895, 1110, 1385];
-    const fireflies = [
-      { x: 290, y: 300 }, { x: 520, y: 210 }, { x: 1130, y: 230 },
-      { x: 1335, y: 155 }, { x: 1260, y: 380 }, { x: 1015, y: 575 },
-      { x: 315, y: 620 }, { x: 560, y: 470 },
+    const backgroundMotes = [
+      { x: 290, y: 300, phase: 0.1 }, { x: 520, y: 210, phase: 1.8 },
+      { x: 1130, y: 230, phase: 2.4 }, { x: 1335, y: 155, phase: 3.1 },
+      { x: 1260, y: 380, phase: 4.2 }, { x: 1015, y: 575, phase: 5.0 },
+      { x: 315, y: 620, phase: 2.8 }, { x: 560, y: 470, phase: 0.9 },
     ];
 
+    const frogAnim = { name: "idle", frameIndex: 0, elapsed: 0, after: null };
     const state = {
+      mode: GAME_STATE.ATTRACT,
       score: 0,
+      localBest: Number(localStorage.getItem("frog.catch.best") || 0),
       frog: { x: FROG_HOME.x, y: 676 },
       flies: [],
       tongue: null,
       last: performance.now(),
-      spawnTimer: 0,
+      roundStartedAt: 0,
+      roundEndsAt: 0,
+      nextFlyAt: 0,
+      tapCount: 0,
+      hitCount: 0,
+      sessionId: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      leaderboard: [],
     };
 
     function reset() {
+      state.mode = GAME_STATE.ATTRACT;
       state.score = 0;
       state.frog.x = FROG_HOME.x;
       state.frog.y = frogHomeY();
       state.flies = [];
       state.tongue = null;
-      state.spawnTimer = 0;
-      for (let i = 0; i < 1; i++) spawnFly();
+      state.roundStartedAt = 0;
+      state.roundEndsAt = 0;
+      state.nextFlyAt = 0;
+      state.tapCount = 0;
+      state.hitCount = 0;
+      setFrogAnimation("idle");
+      spawnFly({ calm: true });
     }
 
     function groundY() {
-      return viewport.virtualHeight - Math.max(44, viewport.footerReserve);
+      return viewport.virtualHeight - Math.max(viewport.portraitStage ? 760 : 44, viewport.footerReserve);
     }
 
     function frogHomeY() {
       return groundY() - 166;
     }
 
-    function spawnFly() {
+    function randomRange(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function spawnFly(options = {}) {
+      const axis = Math.random() < 0.65 ? "x" : "y";
+      let x = randomRange(260, VIRTUAL.width - 260);
+      let y = randomRange(130, groundY() - 280);
+      if (Math.hypot(x - state.frog.x, y - (state.frog.y - 70)) < 260) {
+        x = x < state.frog.x ? 260 : VIRTUAL.width - 260;
+      }
       state.flies.push({
-        x: 420 + Math.random() * 700,
-        y: 145 + Math.random() * 90,
-        vx: (Math.random() < 0.5 ? -1 : 1) * (18 + Math.random() * 20),
-        bob: Math.random() * Math.PI * 2,
+        x,
+        y,
+        axis,
+        sign: Math.random() < 0.5 ? -1 : 1,
+        speed: options.calm ? randomRange(25, 38) : randomRange(45, 85),
+        axisTimer: randomRange(0.7, 1.8),
         phase: Math.floor(Math.random() * sprites.fly.frames),
+        hitRadius: 44,
       });
     }
 
@@ -314,81 +419,357 @@
       };
     }
 
-    function fireTongue(point = null) {
-      if (state.tongue) return;
-      const mouth = { x: state.frog.x, y: state.frog.y - 68 };
-      let target = null;
-      let best = Infinity;
+    function setFrogAnimation(name, options = {}) {
+      frogAnim.name = frogManifest.animations[name] ? name : "idle";
+      frogAnim.frameIndex = 0;
+      frogAnim.elapsed = 0;
+      frogAnim.after = options.after || null;
+    }
 
-      for (const fly of state.flies) {
-        const dx = fly.x - mouth.x;
-        const dy = fly.y - mouth.y;
-        const dist = Math.hypot(dx, dy);
-        const aimBonus = point ? Math.hypot(fly.x - point.x, fly.y - point.y) : 0;
-        const score = dist + aimBonus * 1.8;
-        if (dy < 80 && score < best && dist < 860 && (!point || aimBonus < 78)) {
-          best = score;
-          target = fly;
+    function updateFrogAnimation(dt) {
+      const anim = frogManifest.animations[frogAnim.name] || frogManifest.animations.idle;
+      frogAnim.elapsed += dt;
+      const frameDuration = 1 / anim.fps;
+      while (frogAnim.elapsed >= frameDuration) {
+        frogAnim.elapsed -= frameDuration;
+        frogAnim.frameIndex += 1;
+        if (frogAnim.frameIndex >= anim.frames.length) {
+          if (anim.loop) {
+            frogAnim.frameIndex = 0;
+          } else if (frogAnim.after) {
+            setFrogAnimation(frogAnim.after);
+          } else {
+            setFrogAnimation("idle");
+          }
         }
       }
+    }
 
+    function getCurrentFrogFrame() {
+      const anim = frogManifest.animations[frogAnim.name] || frogManifest.animations.idle;
+      return anim.frames[Math.min(frogAnim.frameIndex, anim.frames.length - 1)] || 0;
+    }
+
+    function distancePointToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      if (dx === 0 && dy === 0) return Math.hypot(px - x1, py - y1);
+      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function findCaughtFly(mouth, targetPoint) {
+      let bestFly = null;
+      let bestDistance = Infinity;
+      for (const fly of state.flies) {
+        const distanceToTap = Math.hypot(fly.x - targetPoint.x, fly.y - targetPoint.y);
+        const distanceToTongue = distancePointToSegment(fly.x, fly.y, mouth.x, mouth.y, targetPoint.x, targetPoint.y);
+        const hitRadius = fly.hitRadius || 44;
+        if (distanceToTap < hitRadius * 1.4 || distanceToTongue < hitRadius) {
+          const score = Math.min(distanceToTap, distanceToTongue);
+          if (score < bestDistance) {
+            bestDistance = score;
+            bestFly = fly;
+          }
+        }
+      }
+      return bestFly;
+    }
+
+    function startRound(now) {
+      state.mode = GAME_STATE.PLAYING;
+      state.roundStartedAt = now;
+      state.roundEndsAt = now + ROUND.durationMs;
+      state.nextFlyAt = now + ROUND.addFlyEveryMs;
+      state.score = 0;
+      state.tapCount = 0;
+      state.hitCount = 0;
+      state.flies = [];
+      for (let i = 0; i < ROUND.initialFlyCount; i++) spawnFly();
+    }
+
+    function saveLocalBest(score) {
+      if (score <= state.localBest) return;
+      state.localBest = score;
+      localStorage.setItem("frog.catch.best", String(score));
+    }
+
+    async function getLeaderboard() {
+      if (!LEADERBOARD_ENABLED) return [];
+      const response = await fetch("/api/leaderboard?limit=10");
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.scores || [];
+    }
+
+    async function submitScore(payload) {
+      if (!LEADERBOARD_ENABLED) return { ok: false, localOnly: true };
+      const response = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      return response.json().catch(() => ({ ok: false }));
+    }
+
+    function endRound(now) {
+      state.mode = GAME_STATE.ROUND_OVER;
+      state.tongue = null;
+      setFrogAnimation("idle");
+      saveLocalBest(state.score);
+      const duration = Math.round(now - state.roundStartedAt);
+      submitScore({
+        sessionId: state.sessionId,
+        playerName: "YOU",
+        score: state.score,
+        roundDurationMs: duration,
+        tapCount: state.tapCount,
+        hitCount: state.hitCount,
+        clientVersion: "1.0.0",
+      });
+      getLeaderboard().then((scores) => { state.leaderboard = scores; });
+    }
+
+    function fireTongue(point = null, now = performance.now()) {
+      if (state.tongue) return;
+      if (state.mode === GAME_STATE.ROUND_OVER) return;
+      if (state.mode === GAME_STATE.ATTRACT) startRound(now);
+      state.tapCount += 1;
+      const aimPoint = point || { x: state.frog.x, y: state.frog.y - 360 };
+      const mouth = getMouthPoint(aimPoint);
+      const targetPoint = aimPoint;
+      const target = findCaughtFly(mouth, targetPoint);
+      const dx = targetPoint.x - mouth.x;
+      const dy = targetPoint.y - mouth.y;
+      const attack = chooseAttackAnimation(dx, dy);
+      const anim = frogManifest.animations[attack.name] || frogManifest.animations.idle;
+      setFrogAnimation(attack.name);
       state.tongue = {
         t: 0,
-        duration: 0.24,
+        duration: attack.useSpriteTongue
+          ? (anim.frames.length / anim.fps)
+          : (TONGUE.extendMs + TONGUE.holdMs + TONGUE.retractMs) / 1000,
         from: mouth,
-        to: target ? { x: target.x, y: target.y } : point || { x: mouth.x, y: mouth.y - 360 },
+        to: targetPoint,
         target,
+        attackName: attack.name,
+        useSpriteTongue: attack.useSpriteTongue,
+        resolved: false,
       };
     }
 
-    function update(dt) {
-      for (const fly of state.flies) {
-        fly.x += fly.vx * dt;
-        fly.bob += dt * 5;
-        fly.y += Math.sin(fly.bob) * 0.45;
-        if (fly.x < 290 || fly.x > 1246) fly.vx *= -1;
+    function chooseAttackAnimation(dx, dy) {
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (absX > absY * 1.22) {
+        return { name: dx < 0 ? "attackLeft" : "attackRight", useSpriteTongue: true };
       }
-
-      state.spawnTimer += dt;
-      if (state.spawnTimer > 2.4 && state.flies.length < 1) {
-        state.spawnTimer = 0;
-        spawnFly();
+      if (dy < 0 && absY > absX * 0.86) {
+        return { name: "attackUp", useSpriteTongue: true };
       }
+      return {
+        name: absX > absY ? "attackHorizontal" : "attackVertical",
+        useSpriteTongue: false,
+      };
+    }
 
-      if (state.tongue) {
-        state.tongue.t += dt;
-        if (state.tongue.t > state.tongue.duration) {
-          if (state.tongue.target) {
-            state.flies = state.flies.filter((fly) => fly !== state.tongue.target);
-            state.score += 1;
-            spawnFly();
-          }
-          state.tongue = null;
+    function updateFly(fly, dt) {
+      if (fly.axis === "x") fly.x += fly.sign * fly.speed * dt;
+      else fly.y += fly.sign * fly.speed * dt;
+      fly.axisTimer -= dt;
+      if (fly.axisTimer <= 0) {
+        fly.axis = Math.random() < 0.65 ? "x" : "y";
+        fly.sign = Math.random() < 0.5 ? -1 : 1;
+        fly.axisTimer = randomRange(0.7, 1.8);
+      }
+      if (fly.x < 160) { fly.x = 160; fly.sign = 1; fly.axis = "x"; }
+      if (fly.x > VIRTUAL.width - 160) { fly.x = VIRTUAL.width - 160; fly.sign = -1; fly.axis = "x"; }
+      const minY = 120;
+      const maxY = groundY() - 260;
+      if (fly.y < minY) { fly.y = minY; fly.sign = 1; fly.axis = "y"; }
+      if (fly.y > maxY) { fly.y = maxY; fly.sign = -1; fly.axis = "y"; }
+    }
+
+    function update(dt, now) {
+      updateFrogAnimation(dt);
+      if (state.mode === GAME_STATE.ATTRACT) {
+        for (const fly of state.flies) updateFly(fly, dt * 0.45);
+      }
+      if (state.mode === GAME_STATE.PLAYING) {
+        if (now >= state.roundEndsAt) endRound(now);
+        for (const fly of state.flies) updateFly(fly, dt);
+        while (now >= state.nextFlyAt && state.flies.length < ROUND.maxFlyCount) {
+          spawnFly();
+          state.nextFlyAt += ROUND.addFlyEveryMs;
         }
       }
+      if (state.tongue) {
+        state.tongue.t += dt;
+        const resolveAt = state.tongue.useSpriteTongue
+          ? state.tongue.duration * 0.62
+          : (TONGUE.extendMs + TONGUE.holdMs) / 1000;
+        if (!state.tongue.resolved && state.tongue.t >= resolveAt) {
+          state.tongue.resolved = true;
+          if (state.tongue.target && state.mode === GAME_STATE.PLAYING) {
+            state.flies = state.flies.filter((fly) => fly !== state.tongue.target);
+            state.score += 1;
+            state.hitCount += 1;
+            spawnFly();
+          }
+        }
+        if (state.tongue.t >= state.tongue.duration) {
+          const nextAnim = state.tongue.target ? "catchChew" : "missRecover";
+          state.tongue = null;
+          setFrogAnimation(nextAnim);
+        }
+      }
+    }
+
+    function getFrogTopLeft() {
+      const scale = frogManifest.scale;
+      return {
+        x: state.frog.x - frogManifest.mouthOffset.x * scale,
+        y: state.frog.y - frogManifest.mouthOffset.y * scale,
+      };
+    }
+
+    function getMouthPoint(targetPoint = null) {
+      const topLeft = getFrogTopLeft();
+      const anchors = frogManifest.tongueAnchors || {};
+      const fallback = frogManifest.tongueAnchor || { x: 136, y: 254 };
+      let anchor = fallback;
+      if (targetPoint) {
+        const center = {
+          x: topLeft.x + fallback.x * frogManifest.scale,
+          y: topLeft.y + fallback.y * frogManifest.scale,
+        };
+        const dx = targetPoint.x - center.x;
+        const dy = targetPoint.y - center.y;
+        if (Math.abs(dy) > Math.abs(dx) * 1.05 && dy < 0) {
+          anchor = anchors.up || { x: 136, y: 214 };
+        } else if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
+          anchor = anchors.left || { x: 98, y: 248 };
+        } else if (Math.abs(dx) > Math.abs(dy) && dx > 0) {
+          anchor = anchors.right || { x: 174, y: 248 };
+        } else if (dy > 0) {
+          anchor = anchors.down || { x: 136, y: 270 };
+        }
+      }
+      return {
+        x: topLeft.x + anchor.x * frogManifest.scale,
+        y: topLeft.y + anchor.y * frogManifest.scale,
+      };
+    }
+
+    function getManifestPoint(point) {
+      const topLeft = getFrogTopLeft();
+      return {
+        x: topLeft.x + point.x * frogManifest.scale,
+        y: topLeft.y + point.y * frogManifest.scale,
+      };
+    }
+
+    function drawEyeGlow(now) {
+      const sprite = sprites.frog;
+      if (!frogManifest.eyeGlowAnchors) return;
+      const topLeft = getFrogTopLeft();
+      const alpha = 0.055 + Math.sin(now / 850) * 0.018;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = `rgba(99, 239, 66, ${alpha})`;
+      ctx.shadowColor = "rgba(99, 239, 66, 0.9)";
+      ctx.shadowBlur = 22;
+      for (const eye of frogManifest.eyeGlowAnchors) {
+        ctx.beginPath();
+        ctx.arc(topLeft.x + eye.x * frogManifest.scale, topLeft.y + eye.y * frogManifest.scale, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     function drawFrog(now) {
       const sprite = sprites.frog;
       if (!sprite.image.complete) return;
-      const frame = state.tongue
-        ? sprite.attackFrame
-        : Math.floor(now / 130) % sprite.frames;
-      const dw = sprite.frameWidth * sprite.scale;
-      const dh = sprite.frameHeight * sprite.scale;
-      const dx = state.frog.x - sprite.mouthOffset.x * sprite.scale;
-      const dy = state.frog.y - sprite.mouthOffset.y * sprite.scale;
+      const frame = getCurrentFrogFrame();
+      const sx = (frame % frogManifest.columns) * frogManifest.frameWidth;
+      const sy = Math.floor(frame / frogManifest.columns) * frogManifest.frameHeight;
+      const dw = frogManifest.frameWidth * frogManifest.scale;
+      const dh = frogManifest.frameHeight * frogManifest.scale;
+      const topLeft = getFrogTopLeft();
+      drawEyeGlow(now);
+      const source = state.tongue && state.tongue.useSpriteTongue
+        ? getOrangeMaskedFrogFrame(frame, sx, sy)
+        : sprite.image;
+      const sourceX = source === sprite.image ? sx : 0;
+      const sourceY = source === sprite.image ? sy : 0;
       ctx.drawImage(
-        sprite.image,
-        frame * sprite.frameWidth,
-        0,
-        sprite.frameWidth,
-        sprite.frameHeight,
-        dx,
-        dy,
+        source,
+        sourceX,
+        sourceY,
+        frogManifest.frameWidth,
+        frogManifest.frameHeight,
+        topLeft.x,
+        topLeft.y,
         dw,
         dh
       );
+      if (pixelTongueMaskUnavailable) maskAuthoredTongueRect();
+    }
+
+    function maskAuthoredTongueRect() {
+      if (!state.tongue || !state.tongue.useSpriteTongue) return;
+      const mask = frogManifest.tongueMasks && frogManifest.tongueMasks[state.tongue.attackName];
+      if (!mask) return;
+      const topLeft = getFrogTopLeft();
+      ctx.save();
+      ctx.fillStyle = COLORS.bg;
+      ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
+      ctx.shadowBlur = 5;
+      ctx.fillRect(
+        topLeft.x + mask.x * frogManifest.scale,
+        topLeft.y + mask.y * frogManifest.scale,
+        mask.w * frogManifest.scale,
+        mask.h * frogManifest.scale
+      );
+      ctx.restore();
+    }
+
+    function getOrangeMaskedFrogFrame(frame, sx, sy) {
+      if (maskedFrogFrames.has(frame)) return maskedFrogFrames.get(frame);
+      const offscreen = document.createElement("canvas");
+      offscreen.width = frogManifest.frameWidth;
+      offscreen.height = frogManifest.frameHeight;
+      const offscreenCtx = offscreen.getContext("2d", { willReadFrequently: true });
+      offscreenCtx.drawImage(
+        sprites.frog.image,
+        sx,
+        sy,
+        frogManifest.frameWidth,
+        frogManifest.frameHeight,
+        0,
+        0,
+        frogManifest.frameWidth,
+        frogManifest.frameHeight
+      );
+      try {
+        const image = offscreenCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+        const data = image.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+          if (a > 12 && r > 145 && g > 45 && g < 185 && b < 90 && r > g * 1.18) {
+            data[i + 3] = 0;
+          }
+        }
+        offscreenCtx.putImageData(image, 0, 0);
+        maskedFrogFrames.set(frame, offscreen);
+        return offscreen;
+      } catch {
+        pixelTongueMaskUnavailable = true;
+        return sprites.frog.image;
+      }
     }
 
     function drawFly(fly, now) {
@@ -412,25 +793,103 @@
 
     function drawTongue() {
       if (!state.tongue) return;
-      const { from, to, t, duration } = state.tongue;
-      const p = Math.min(1, t / duration);
+      if (state.tongue.useSpriteTongue) {
+        drawAuthoredTongueReplacement();
+        return;
+      }
+      const { from, to, t } = state.tongue;
+      const extend = TONGUE.extendMs / 1000;
+      const hold = TONGUE.holdMs / 1000;
+      const retract = TONGUE.retractMs / 1000;
+      let amount = 1;
+      if (t < extend) amount = t / extend;
+      else if (t > extend + hold) amount = 1 - Math.min(1, (t - extend - hold) / retract);
+      amount = 1 - Math.pow(1 - Math.max(0, Math.min(1, amount)), 3);
       const tip = {
-        x: from.x + (to.x - from.x) * Math.sin(p * Math.PI),
-        y: from.y + (to.y - from.y) * Math.sin(p * Math.PI),
+        x: from.x + (to.x - from.x) * amount,
+        y: from.y + (to.y - from.y) * amount,
       };
+      drawTongueGlyphSegment(from, tip, amount, { connector: true });
+    }
+
+    function drawAuthoredTongueReplacement() {
+      const { from, to, t, duration } = state.tongue;
+      const progress = Math.max(0, Math.min(1, t / duration));
+      let amount = 1;
+      if (progress < 0.08) amount = progress / 0.08;
+      else if (progress < 0.62) amount = 1;
+      else if (progress > 0.84) amount = 1 - ((progress - 0.84) / 0.16);
+      amount = 1 - Math.pow(1 - Math.max(0, Math.min(1, amount)), 3);
+      if (amount <= 0.02) return;
+      const currentEnd = {
+        x: from.x + (to.x - from.x) * amount,
+        y: from.y + (to.y - from.y) * amount,
+      };
+      drawTongueGlyphSegment(from, currentEnd, amount, { connector: true, spacing: 24 });
+    }
+
+    function drawTongueGlyphSegment(from, tip, amount, options = {}) {
+      const dx = tip.x - from.x;
+      const dy = tip.y - from.y;
+      const length = Math.hypot(dx, dy);
+      if (length < 10) return;
+      const ux = dx / length;
+      const uy = dy / length;
+      const spacing = options.spacing || 28;
+      const glyphCount = Math.max(1, Math.floor(length / spacing));
+      const angle = Math.atan2(dy, dx);
+      const absCos = Math.abs(Math.cos(angle));
+      const absSin = Math.abs(Math.sin(angle));
+      const horizontal = absCos > 0.76;
+      const vertical = absSin > 0.76;
+      const diagonalGlyph = dx * dy > 0 ? "\\" : "/";
+      const glyphPattern = horizontal
+        ? ["-", "~", "-", "-", "~"]
+        : vertical
+          ? ["|", "|", "+", "|", "~"]
+          : [diagonalGlyph, "-", "~", diagonalGlyph, "-"];
+
       ctx.save();
-      ctx.strokeStyle = COLORS.tongue;
+      if (options.connector) drawTongueMouthConnector(from, ux, uy, horizontal, vertical);
       ctx.fillStyle = COLORS.tongue;
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(from.x, from.y);
-      ctx.lineTo(tip.x, tip.y);
-      ctx.stroke();
-      ctx.font = "30px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+      ctx.shadowColor = "rgba(255, 138, 0, 0.7)";
+      ctx.shadowBlur = 7;
+      ctx.font = mono(900, 25);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("*", tip.x, tip.y);
+      const start = options.skipFirstGlyph ? 2 : 1;
+      for (let i = start; i <= glyphCount; i++) {
+        const distance = i * spacing;
+        const x = from.x + ux * distance;
+        const y = from.y + uy * distance;
+        const glyph = i === glyphCount ? "•" : glyphPattern[(i - 1) % glyphPattern.length];
+        ctx.fillText(glyph, x, y);
+      }
+      ctx.restore();
+    }
+
+    function drawTongueMouthConnector(from, ux, uy, horizontal, vertical) {
+      ctx.save();
+      ctx.fillStyle = COLORS.tongue;
+      ctx.shadowColor = "rgba(255, 138, 0, 0.55)";
+      ctx.shadowBlur = 7;
+      ctx.font = mono(900, 24);
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      if (vertical && uy < 0) {
+        ctx.fillText("•", from.x, from.y + 2);
+        ctx.fillText("|", from.x, from.y - 14);
+      } else if (horizontal && ux < 0) {
+        ctx.fillText("•", from.x + 4, from.y);
+        ctx.fillText("~", from.x - 10, from.y);
+      } else if (horizontal && ux > 0) {
+        ctx.fillText("•", from.x - 4, from.y);
+        ctx.fillText("~", from.x + 10, from.y);
+      } else {
+        ctx.fillText("•", from.x, from.y);
+      }
+
       ctx.restore();
     }
 
@@ -467,17 +926,29 @@
 
     function drawText() {
       const score = String(state.score).padStart(2, "0");
-      const scoreFont = openAISans(500, 18);
-      const helperFont = openAISans(500, 16);
-      drawInlineText([
-        { text: "score ", color: COLORS.muted },
-        { text: score, color: COLORS.blue },
-      ], 44, 48, { font: scoreFont });
-
-      drawInlineText([
-        { text: "_", color: COLORS.blue },
-      ], 44, 82, { font: mono(700, 18) });
-
+      const remaining = state.mode === GAME_STATE.PLAYING
+        ? Math.max(0, Math.ceil((state.roundEndsAt - performance.now()) / 1000))
+        : 30;
+      ctx.save();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.shadowColor = "rgba(99, 239, 66, 0.24)";
+      ctx.shadowBlur = 7;
+      ctx.font = mono(500, HUD.labelSize);
+      ctx.fillStyle = COLORS.hudGreen;
+      ctx.fillText("S C O R E", HUD.x, HUD.y);
+      ctx.fillText("TIME", HUD.x, HUD.y + 46);
+      ctx.font = mono(700, HUD.scoreSize);
+      ctx.fillStyle = COLORS.hudNumber;
+      ctx.fillText(score, HUD.x + 106, HUD.y - 10);
+      ctx.font = mono(700, HUD.timerSize);
+      ctx.fillText(String(remaining).padStart(2, "0"), HUD.x + 106, HUD.y + 45);
+      ctx.shadowBlur = 0;
+      ctx.font = mono(500, 16);
+      ctx.fillStyle = COLORS.hudDim;
+      ctx.globalAlpha = 0.55;
+      ctx.fillText(".......", HUD.x, HUD.y + 78);
+      ctx.restore();
     }
 
     function drawMonoText(text, x, y, options = {}) {
@@ -501,28 +972,57 @@
         ctx.fill();
       }
 
-      ctx.globalAlpha = 1;
-      ctx.font = mono(700, 32);
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
       for (const x of grassClusters) {
-        ctx.fillText("^^^^", x, groundY() - 24);
+        drawGrassCluster(ctx, x, groundY() - 2);
       }
       ctx.restore();
     }
 
-    function drawFireflies(now) {
+    function drawGrassCluster(ctx, x, y) {
+      ctx.save();
+      ctx.strokeStyle = COLORS.frog;
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = "round";
+      ctx.globalAlpha = 0.94;
+      const blades = [[-8, 0, -12, -18], [-3, 0, -4, -22], [3, 0, 4, -22], [8, 0, 12, -18]];
+      for (const [x1, y1, x2, y2] of blades) {
+        ctx.beginPath();
+        ctx.moveTo(x + x1, y + y1);
+        ctx.lineTo(x + x2, y + y2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawBackgroundMotes(now) {
       ctx.save();
       ctx.fillStyle = COLORS.frog;
       ctx.font = mono(700, 18);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      for (let i = 0; i < fireflies.length; i++) {
-        const mote = fireflies[i];
-        const alpha = 0.45 + Math.sin(now / 520 + i) * 0.25;
-        ctx.globalAlpha = Math.max(0.18, alpha);
+      for (const mote of backgroundMotes) {
+        ctx.globalAlpha = 0.18 + Math.sin(now / 900 + mote.phase) * 0.08;
         ctx.fillText("..", mote.x, mote.y);
       }
+      ctx.restore();
+    }
+
+    function drawRoundOver() {
+      if (state.mode !== GAME_STATE.ROUND_OVER) return;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = mono(900, 34);
+      ctx.fillStyle = COLORS.blue;
+      ctx.shadowColor = "rgba(50, 152, 255, 0.55)";
+      ctx.shadowBlur = 12;
+      ctx.fillText(`SCORE ${String(state.score).padStart(2, "0")}`, VIRTUAL.width / 2, 238);
+      ctx.shadowBlur = 0;
+      ctx.font = mono(800, 16);
+      ctx.fillStyle = COLORS.frog;
+      ctx.fillText(`BEST ${String(state.localBest).padStart(2, "0")}`, VIRTUAL.width / 2, 278);
+      ctx.fillStyle = COLORS.muted;
+      ctx.fillText("click or press r to reset", VIRTUAL.width / 2, 310);
       ctx.restore();
     }
 
@@ -533,22 +1033,23 @@
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       applyGameTransform();
       ctx.clearRect(0, 0, VIRTUAL.width, viewport.virtualHeight);
-      drawText();
-      drawFireflies(now);
+      drawBackgroundMotes(now);
       drawGround();
 
       for (const fly of state.flies) {
         drawFly(fly, now);
       }
 
-      drawTongue();
       drawFrog(now);
+      drawTongue();
+      drawText();
+      drawRoundOver();
     }
 
     function frame(now) {
       const dt = Math.min(0.033, (now - state.last) / 1000);
       state.last = now;
-      update(dt);
+      update(dt, now);
       draw(now);
       requestAnimationFrame(frame);
     }
@@ -556,7 +1057,7 @@
     addEventListener("keydown", (event) => {
       if (event.key === " ") {
         event.preventDefault();
-        fireTongue();
+        fireTongue(null, performance.now());
       }
       if (event.key.toLowerCase() === "r") {
         event.preventDefault();
@@ -567,14 +1068,37 @@
     canvas.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       canvas.focus();
+      if (state.mode === GAME_STATE.ROUND_OVER) {
+        reset();
+        return;
+      }
       const point = canvasPoint(event);
-      fireTongue(point);
+      fireTongue(point, performance.now());
     });
 
-    reset();
-    resizeCanvas();
-    addEventListener("resize", resizeCanvas);
-    requestAnimationFrame(frame);
+    async function loadFrogManifest() {
+      try {
+        const response = await fetch("sprites/frog_manifest.json", { cache: "no-store" });
+        if (response.ok) frogManifest = await response.json();
+      } catch (error) {
+        frogManifest = defaultFrogManifest;
+      }
+      await new Promise((resolve) => {
+        sprites.frog.image.onload = resolve;
+        sprites.frog.image.onerror = resolve;
+        sprites.frog.image.src = frogManifest.image;
+      });
+    }
+
+    async function boot() {
+      await loadFrogManifest();
+      reset();
+      resizeCanvas();
+      addEventListener("resize", resizeCanvas);
+      requestAnimationFrame(frame);
+    }
+
+    boot();
   </script>
 </body>
 </html>
