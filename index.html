@@ -134,6 +134,34 @@
       white-space: nowrap;
     }
 
+    .reset-control {
+      appearance: none;
+      border: 0;
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      color: #5f8c45;
+      font: inherit;
+      letter-spacing: inherit;
+      text-align: left;
+      text-shadow: inherit;
+      cursor: pointer;
+      pointer-events: auto;
+    }
+
+    .reset-control:hover {
+      color: #6f9f50;
+    }
+
+    .reset-control:focus-visible {
+      outline: 1px solid rgb(111 159 80 / 0.82);
+      outline-offset: 4px;
+    }
+
+    .reset-mobile-label {
+      display: none;
+    }
+
     .footer-controls {
       min-width: 0;
       overflow-wrap: anywhere;
@@ -172,6 +200,14 @@
         line-height: 1.05;
       }
 
+      .reset-desktop-label {
+        display: none;
+      }
+
+      .reset-mobile-label {
+        display: inline;
+      }
+
       .footer-links {
         gap: 8px;
       }
@@ -195,7 +231,10 @@
     <div class="stage">
       <canvas id="game" width="1536" height="900" tabindex="0" aria-label="ASCII frog fly catching game"></canvas>
       <div class="footer-ui" aria-label="game links and controls">
-        <span class="footer-controls">press <span class="accent">r</span> to reset</span>
+        <button class="reset-control footer-controls" id="resetControl" type="button" aria-label="Reset game">
+          <span class="reset-desktop-label">press <span class="accent">r</span> to reset</span>
+          <span class="reset-mobile-label">reset</span>
+        </button>
         <span class="footer-links">
           <a href="https://x.com/jskoiz" target="_blank" rel="noopener noreferrer">by <span class="accent">@jskoiz</span></a>
           <span aria-hidden="true">/</span>
@@ -209,6 +248,7 @@
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
     const footer = document.querySelector(".footer-ui");
+    const resetControl = document.getElementById("resetControl");
 
     const VIRTUAL = { width: 1536, height: 900 };
     const COLORS = {
@@ -225,7 +265,30 @@
       muted: "#85868c",
       darkGreen: "rgba(99, 239, 66, 0.16)",
     };
-    const HUD = { x: 58, y: 54, labelSize: 15, scoreSize: 42, timerSize: 17 };
+    const HUD = {
+      x: 58,
+      y: 54,
+      labelSize: 15,
+      scoreSize: 42,
+      timerSize: 17,
+      scoreX: 106,
+      scoreY: -10,
+      timeY: 38,
+      timerX: 106,
+      timerY: 37,
+    };
+    const MOBILE_HUD = {
+      x: 58,
+      y: 54,
+      labelSize: 40,
+      scoreSize: 124,
+      timerSize: 36,
+      scoreX: 190,
+      scoreY: -30,
+      timeY: 78,
+      timerX: 190,
+      timerY: 76,
+    };
     const GAME_STATE = { ATTRACT: "attract", PLAYING: "playing", ROUND_OVER: "roundOver" };
     const ROUND = { durationMs: 30000, initialFlyCount: 2, maxFlyCount: 5, addFlyEveryMs: 8000 };
     const TONGUE = { extendMs: 150, holdMs: 95, retractMs: 155, cooldownMs: 180 };
@@ -955,6 +1018,7 @@
     }
 
     function drawText() {
+      const hud = viewport.portraitStage ? MOBILE_HUD : HUD;
       const score = String(state.score).padStart(2, "0");
       const remaining = state.mode === GAME_STATE.PLAYING
         ? Math.max(0, Math.ceil((state.roundEndsAt - performance.now()) / 1000))
@@ -964,15 +1028,15 @@
       ctx.textBaseline = "top";
       ctx.shadowColor = "rgba(99, 239, 66, 0.24)";
       ctx.shadowBlur = 7;
-      ctx.font = mono(500, HUD.labelSize);
+      ctx.font = mono(500, hud.labelSize);
       ctx.fillStyle = COLORS.hudGreen;
-      ctx.fillText("S C O R E", HUD.x, HUD.y);
-      ctx.fillText("TIME", HUD.x, HUD.y + 38);
-      ctx.font = mono(700, HUD.scoreSize);
+      ctx.fillText("S C O R E", hud.x, hud.y);
+      ctx.fillText("TIME", hud.x, hud.y + hud.timeY);
+      ctx.font = mono(700, hud.scoreSize);
       ctx.fillStyle = COLORS.hudNumber;
-      ctx.fillText(score, HUD.x + 106, HUD.y - 10);
-      ctx.font = mono(700, HUD.timerSize);
-      ctx.fillText(String(remaining).padStart(2, "0"), HUD.x + 106, HUD.y + 37);
+      ctx.fillText(score, hud.x + hud.scoreX, hud.y + hud.scoreY);
+      ctx.font = mono(700, hud.timerSize);
+      ctx.fillText(String(remaining).padStart(2, "0"), hud.x + hud.timerX, hud.y + hud.timerY);
       ctx.restore();
     }
 
@@ -1099,6 +1163,13 @@
       }
       const point = canvasPoint(event);
       fireTongue(point, performance.now());
+    });
+
+    resetControl.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      reset();
+      canvas.focus();
     });
 
     async function loadFrogManifest() {
