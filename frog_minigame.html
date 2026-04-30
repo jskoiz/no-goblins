@@ -69,24 +69,18 @@
     main {
       width: 100vw;
       height: 100vh;
-      padding: 12px;
-      display: grid;
-      place-items: start center;
+      padding: 0;
     }
 
     .stage {
       position: relative;
-      width: min(calc(100vw - 24px), calc((100vh - 24px) * 1.6));
-      height: min(calc(100vh - 24px), calc((100vw - 24px) / 1.6));
+      width: 100vw;
+      height: 100vh;
       background:
         radial-gradient(circle at 30% 30%, rgb(70 239 58 / 0.035), transparent 28%),
         #000;
-      border: 1px solid rgba(99, 239, 66, 0.18);
-      border-radius: clamp(14px, 2vmin, 28px);
       overflow: hidden;
-      box-shadow:
-        inset 0 0 46px rgb(70 239 58 / 0.055),
-        inset 0 0 1px rgb(70 239 58 / 0.16);
+      box-shadow: inset 0 0 46px rgb(70 239 58 / 0.055);
     }
 
     canvas {
@@ -107,7 +101,7 @@
       position: absolute;
       left: clamp(30px, 4vmin, 58px);
       right: clamp(30px, 4vmin, 58px);
-      bottom: clamp(22px, 4vmin, 48px);
+      bottom: max(12px, env(safe-area-inset-bottom));
       z-index: 2;
       display: flex;
       align-items: center;
@@ -157,11 +151,11 @@
       .footer-ui {
         left: 18px;
         right: 18px;
-        bottom: 14px;
+        bottom: max(10px, env(safe-area-inset-bottom));
         align-items: center;
         flex-direction: row;
         gap: 10px;
-        font-size: 11px;
+        font-size: 10px;
       }
 
       .footer-links {
@@ -169,8 +163,8 @@
       }
 
       .stage {
-        width: calc(100vw - 24px);
-        height: min(calc(100vh - 24px), 720px);
+        width: 100vw;
+        height: 100vh;
       }
     }
 
@@ -187,7 +181,7 @@
     <div class="stage">
       <canvas id="game" width="1536" height="900" tabindex="0" aria-label="ASCII frog fly catching game"></canvas>
       <div class="footer-ui" aria-label="game links and controls">
-        <span class="footer-controls">click flies to catch · press <span class="accent">r</span> to reset</span>
+        <span class="footer-controls">press <span class="accent">r</span> to reset</span>
         <span class="footer-links">
           <a href="https://x.com/jskoiz" target="_blank" rel="noopener noreferrer">by <span class="accent">@jskoiz</span></a>
           <a href="#github">github</a>
@@ -287,19 +281,10 @@
       viewport.height = Math.max(1, rect.height);
       viewport.dpr = Math.min(2, window.devicePixelRatio || 1);
       viewport.portraitStage = viewport.width < 700 && viewport.height > viewport.width * 1.2;
-      viewport.scale = viewport.portraitStage
-        ? viewport.width / VIRTUAL.width
-        : Math.min(
-            viewport.width / VIRTUAL.width,
-            viewport.height / VIRTUAL.height
-          );
-      viewport.virtualHeight = viewport.portraitStage
-        ? Math.max(VIRTUAL.height, viewport.height / viewport.scale)
-        : VIRTUAL.height;
-      viewport.offsetX = (viewport.width - VIRTUAL.width * viewport.scale) / 2;
-      viewport.offsetY = viewport.portraitStage
-        ? 0
-        : (viewport.height - VIRTUAL.height * viewport.scale) / 2;
+      viewport.scale = viewport.width / VIRTUAL.width;
+      viewport.virtualHeight = viewport.height / viewport.scale;
+      viewport.offsetX = 0;
+      viewport.offsetY = 0;
       const footerRect = footer.getBoundingClientRect();
       const footerStyles = getComputedStyle(footer);
       const footerBottom = parseFloat(footerStyles.bottom) || 0;
@@ -353,6 +338,7 @@
       nextFlyAt: 0,
       tapCount: 0,
       hitCount: 0,
+      lastTongueAt: -Infinity,
       sessionId: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       leaderboard: [],
     };
@@ -369,36 +355,68 @@
       state.nextFlyAt = 0;
       state.tapCount = 0;
       state.hitCount = 0;
+      state.lastTongueAt = -Infinity;
       setFrogAnimation("idle");
       spawnFly({ calm: true });
     }
 
     function groundY() {
-      return viewport.virtualHeight - Math.max(viewport.portraitStage ? 760 : 44, viewport.footerReserve);
+      return viewport.virtualHeight - groundInset();
+    }
+
+    function groundInset() {
+      const footerPixels = 36 + (viewport.width < 760 ? 10 : 14);
+      return footerPixels / viewport.scale;
+    }
+
+    function flyMinY() {
+      return 120;
+    }
+
+    function flyMaxY() {
+      return Math.max(flyMinY() + 80, groundY() - 260);
     }
 
     function frogHomeY() {
-      return groundY() - 166;
+      return groundY() - 154;
     }
 
     function randomRange(min, max) {
       return min + Math.random() * (max - min);
     }
 
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function normalizeVector(x, y) {
+      const length = Math.hypot(x, y) || 1;
+      return { x: x / length, y: y / length };
+    }
+
     function spawnFly(options = {}) {
-      const axis = Math.random() < 0.65 ? "x" : "y";
       let x = randomRange(260, VIRTUAL.width - 260);
-      let y = randomRange(130, groundY() - 280);
-      if (Math.hypot(x - state.frog.x, y - (state.frog.y - 70)) < 260) {
-        x = x < state.frog.x ? 260 : VIRTUAL.width - 260;
+      let y = randomRange(flyMinY() + 10, flyMaxY());
+      const minFrogDistance = options.calm ? 240 : 300;
+      for (let attempt = 0; attempt < 10; attempt += 1) {
+        const tooCloseToFrog = Math.hypot(x - state.frog.x, y - (state.frog.y - 70)) < minFrogDistance;
+        const tooCloseToFly = state.flies.some((fly) => Math.hypot(x - fly.x, y - fly.y) < 150);
+        if (!tooCloseToFrog && !tooCloseToFly) break;
+        x = randomRange(220, VIRTUAL.width - 220);
+        y = randomRange(flyMinY() + 10, flyMaxY());
       }
+      const heading = normalizeVector(randomRange(-1, 1), randomRange(-0.55, 0.55));
+      const speed = options.calm ? randomRange(25, 38) : randomRange(45, 85);
       state.flies.push({
         x,
         y,
-        axis,
-        sign: Math.random() < 0.5 ? -1 : 1,
-        speed: options.calm ? randomRange(25, 38) : randomRange(45, 85),
-        axisTimer: randomRange(0.7, 1.8),
+        vx: heading.x * speed,
+        vy: heading.y * speed,
+        speed,
+        turnTimer: randomRange(0.45, 1.05),
+        targetVx: heading.x * speed,
+        targetVy: heading.y * speed,
+        bobPhase: randomRange(0, Math.PI * 2),
         phase: Math.floor(Math.random() * sprites.fly.frames),
         hitRadius: 44,
       });
@@ -527,8 +545,10 @@
       if (state.tongue) return;
       if (state.mode === GAME_STATE.ROUND_OVER) return;
       if (state.mode === GAME_STATE.ATTRACT) startRound(now);
+      if (now - state.lastTongueAt < TONGUE.cooldownMs) return;
+      state.lastTongueAt = now;
       state.tapCount += 1;
-      const aimPoint = point || { x: state.frog.x, y: state.frog.y - 360 };
+      const aimPoint = clampAimPoint(point || { x: state.frog.x, y: state.frog.y - 360 });
       const mouth = getMouthPoint(aimPoint);
       const target = findCaughtFly(mouth, aimPoint);
       const targetPoint = target ? { x: target.x, y: target.y } : aimPoint;
@@ -567,21 +587,34 @@
       };
     }
 
+    function clampAimPoint(point) {
+      return {
+        x: clamp(point.x, 72, VIRTUAL.width - 72),
+        y: clamp(point.y, 72, Math.max(72, groundY() - 82)),
+      };
+    }
+
     function updateFly(fly, dt) {
-      if (fly.axis === "x") fly.x += fly.sign * fly.speed * dt;
-      else fly.y += fly.sign * fly.speed * dt;
-      fly.axisTimer -= dt;
-      if (fly.axisTimer <= 0) {
-        fly.axis = Math.random() < 0.65 ? "x" : "y";
-        fly.sign = Math.random() < 0.5 ? -1 : 1;
-        fly.axisTimer = randomRange(0.7, 1.8);
+      fly.turnTimer -= dt;
+      if (fly.turnTimer <= 0) {
+        const heading = normalizeVector(randomRange(-1, 1), randomRange(-0.7, 0.7));
+        fly.targetVx = heading.x * fly.speed;
+        fly.targetVy = heading.y * fly.speed;
+        fly.turnTimer = randomRange(0.45, 1.2);
       }
-      if (fly.x < 160) { fly.x = 160; fly.sign = 1; fly.axis = "x"; }
-      if (fly.x > VIRTUAL.width - 160) { fly.x = VIRTUAL.width - 160; fly.sign = -1; fly.axis = "x"; }
-      const minY = 120;
-      const maxY = groundY() - 260;
-      if (fly.y < minY) { fly.y = minY; fly.sign = 1; fly.axis = "y"; }
-      if (fly.y > maxY) { fly.y = maxY; fly.sign = -1; fly.axis = "y"; }
+      const minY = flyMinY();
+      const maxY = flyMaxY();
+      if (fly.x < 170) fly.targetVx = Math.abs(fly.targetVx);
+      if (fly.x > VIRTUAL.width - 170) fly.targetVx = -Math.abs(fly.targetVx);
+      if (fly.y < minY) fly.targetVy = Math.abs(fly.targetVy);
+      if (fly.y > maxY) fly.targetVy = -Math.abs(fly.targetVy);
+
+      const steering = 1 - Math.pow(0.035, dt);
+      fly.vx += (fly.targetVx - fly.vx) * steering;
+      fly.vy += (fly.targetVy - fly.vy) * steering;
+      fly.bobPhase += dt * 7.5;
+      fly.x = clamp(fly.x + fly.vx * dt, 160, VIRTUAL.width - 160);
+      fly.y = clamp(fly.y + (fly.vy + Math.sin(fly.bobPhase) * 7) * dt, minY, maxY);
     }
 
     function update(dt, now) {
@@ -905,17 +938,12 @@
       ctx.font = mono(500, HUD.labelSize);
       ctx.fillStyle = COLORS.hudGreen;
       ctx.fillText("S C O R E", HUD.x, HUD.y);
-      ctx.fillText("TIME", HUD.x, HUD.y + 46);
+      ctx.fillText("TIME", HUD.x, HUD.y + 38);
       ctx.font = mono(700, HUD.scoreSize);
       ctx.fillStyle = COLORS.hudNumber;
       ctx.fillText(score, HUD.x + 106, HUD.y - 10);
       ctx.font = mono(700, HUD.timerSize);
-      ctx.fillText(String(remaining).padStart(2, "0"), HUD.x + 106, HUD.y + 45);
-      ctx.shadowBlur = 0;
-      ctx.font = mono(500, 16);
-      ctx.fillStyle = COLORS.hudDim;
-      ctx.globalAlpha = 0.55;
-      ctx.fillText(".......", HUD.x, HUD.y + 78);
+      ctx.fillText(String(remaining).padStart(2, "0"), HUD.x + 106, HUD.y + 37);
       ctx.restore();
     }
 
@@ -934,7 +962,7 @@
       ctx.save();
       ctx.fillStyle = COLORS.frog;
       ctx.globalAlpha = 0.82;
-      for (let x = 44; x < VIRTUAL.width - 40; x += 16) {
+      for (let x = 0; x <= VIRTUAL.width; x += 16) {
         ctx.beginPath();
         ctx.arc(x, groundY(), 1.8, 0, Math.PI * 2);
         ctx.fill();
@@ -978,6 +1006,10 @@
     function drawRoundOver() {
       if (state.mode !== GAME_STATE.ROUND_OVER) return;
       ctx.save();
+      ctx.fillStyle = "rgba(0, 0, 0, 0.66)";
+      ctx.fillRect(0, 0, VIRTUAL.width, viewport.virtualHeight);
+      ctx.fillStyle = "rgba(50, 152, 255, 0.08)";
+      ctx.fillRect(0, 0, VIRTUAL.width, viewport.virtualHeight);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = mono(900, 34);
@@ -990,12 +1022,11 @@
       ctx.fillStyle = COLORS.frog;
       ctx.fillText(`BEST ${String(state.localBest).padStart(2, "0")}`, VIRTUAL.width / 2, 278);
       ctx.fillStyle = COLORS.muted;
-      ctx.fillText("click or press r to reset", VIRTUAL.width / 2, 310);
+      ctx.fillText("press r to reset", VIRTUAL.width / 2, 310);
       ctx.restore();
     }
 
     function draw(now) {
-      resizeCanvas();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = COLORS.bg;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1063,6 +1094,8 @@
       reset();
       resizeCanvas();
       addEventListener("resize", resizeCanvas);
+      if (window.visualViewport) window.visualViewport.addEventListener("resize", resizeCanvas);
+      if (document.fonts?.ready) document.fonts.ready.then(resizeCanvas);
       requestAnimationFrame(frame);
     }
 
