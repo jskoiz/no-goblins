@@ -1,5 +1,5 @@
 {
-  "source": "OpenAI DevDay frog/fly recording frames derived from froge-loop.riv",
+  "source": "OpenAI DevDay frog/fly assets derived from froge-loop.riv",
   "frog": {
     "image": "sprites/frog_sheet.png",
     "frameWidth": 360,
@@ -7,7 +7,21 @@
     "frames": 24,
     "crop": { "x": 450, "y": 500, "width": 360, "height": 220 },
     "mouthOffset": { "x": 190, "y": 103 },
-    "scale": 0.6
+    "scale": 0.6,
+    "strikeFrames": [5, 13, 21],
+    "blinkFrames": [3, 11, 19]
+  },
+  "frogFrameSequence": {
+    "directory": "sprites/rive_frog_frames_deduped",
+    "framePattern": "frame_%04d.png",
+    "frameWidth": 360,
+    "frameHeight": 360,
+    "frames": 436,
+    "originalFrames": 1328,
+    "fps": 60,
+    "source": "froge-loop.riv via scripts/export_rive_frames.mjs",
+    "frameMap": "sprites/rive_frog_frame_map.json",
+    "crop": { "x": 120, "y": 100, "width": 360, "height": 360 }
   },
   "fly": {
     "image": "sprites/fly_sheet.png",
