@@ -1,10 +1,8 @@
-# Froge Fly Minigame
+# NO GOBLINS
 
-This folder contains a small, intentionally minimal browser score-attack game inspired by the OpenAI DevDay frog/fly animation.
+A tiny browser score-attack game built from the OpenAI DevDay frog/fly animation.
 
-## Play
-
-From this folder:
+## Run
 
 ```sh
 python3 -m http.server 8765
@@ -13,68 +11,62 @@ python3 -m http.server 8765
 Then open:
 
 ```text
-http://127.0.0.1:8765/frog_minigame.html
+http://127.0.0.1:8765/
 ```
 
-The game is a static single-file Canvas 2D runtime. It does not use React, a game engine, or a build step.
+There is no package install, build step, framework runtime, or backend requirement.
 
-## Main Files
+## Details
 
-- `frog_minigame.html` - playable browser minigame.
-- `sprites/frog_atlas.png` - source 20-column grid atlas for the extracted frog frames.
-- `sprites/frog_atlas_clean.png` - runtime atlas with authored orange tongue pixels removed from attack frames.
-- `sprites/frog_manifest.json` - frog frame dimensions, mouth/eye offsets, and animation ranges.
+- Static Canvas 2D runtime in `index.html`.
+- Source motion comes from sampled frames in `froge-loop.riv`, not a redraw.
+- 1,328 exported frames are deduped to 436 unique frames and packed into a 20-column atlas.
+- `sprites/frog_manifest.json` defines frame dimensions, animation ranges, mouth anchors, tongue tips, and eye glow anchors.
+- Left, right, and upward tongue strikes use source-derived frames. Longer or off-axis throws extend them with Canvas-drawn ASCII tongue segments.
+- `sprites/frog_atlas_clean.png` removes source orange tongue pixels from strike frames so the live tongue starts from the measured mouth anchor.
+- Local best score is stored in `localStorage`; optional leaderboard hooks stay disabled behind `LEADERBOARD_ENABLED = false`.
+
+## Asset Pipeline
+
+```text
+froge-loop.riv
+  -> scripts/export_rive_frames.mjs
+  -> scripts/dedupe_sprite_frames.mjs
+  -> make_sprite_atlas.swift
+  -> sprites/frog_atlas_clean.png + sprites/frog_manifest.json
+```
+
+Useful files:
+
+- `index.html` - the playable game and Canvas runtime.
+- `froge-loop.riv` - source animation reference.
+- `sprites/frog_atlas_clean.png` - runtime frog atlas.
+- `sprites/frog_manifest.json` - frame dimensions, animation ranges, mouth anchors, tongue tips, and eye glow anchors.
+- `sprites/rive_frog_frames_deduped/` - unique sampled source frames used for the atlas.
 - `sprites/fly_sheet.png` - two-frame fly sprite sheet.
-- `sprites/rive_frog_frames_deduped/` - deduped source frame sequence used to build the atlas.
-- `assets/fonts/` - local OpenAI Sans font files used by the HUD.
-- `froge-loop.riv` - canonical source Rive asset kept for reference.
-- `tools/frame-review.html` - local helper for scrubbing the frog atlas and copying animation ranges.
-- `make_sprite_atlas.swift` - local atlas generator for the checked-in Rive frame extracts.
+- `tools/frame-review.html` - local frame scrubber for checking and tuning animation ranges.
+- `assets/favicon.svg`, `assets/og-no-goblins.png` - public metadata assets.
 
-## Frame Review
+## Regenerate The Atlas
 
-Start the local server, then open:
-
-```text
-http://127.0.0.1:8765/tools/frame-review.html
-```
-
-Use the scrubber and range controls to identify better `idle`, `attackHorizontal`, `attackVertical`, `catchChew`, or `missRecover` ranges. Copy the JSON range into `sprites/frog_manifest.json`; the game reads that manifest at startup.
-
-## Regenerating The Frog Atlas
-
-The current browser-safe atlas is a grid rather than a giant horizontal strip:
-
-```text
-frame size: 360 x 360
-columns: 20
-frames: 436
-source atlas: sprites/frog_atlas.png
-runtime atlas: sprites/frog_atlas_clean.png
-manifest: sprites/frog_manifest.json
-```
-
-Regenerate it from the deduped frame folder with:
+The checked-in atlas is already generated. To rebuild it after changing sampled frames:
 
 ```sh
 swift make_sprite_atlas.swift
 ```
 
-The older `sprites/frog_sheet.png` remains for reference, but the game prefers `sprites/frog_manifest.json` and `sprites/frog_atlas_clean.png`. The clean atlas lets the canvas-rendered ASCII tongue start at the mouth consistently in `file://`, Helium, and localhost browser modes.
-
-## Leaderboard
-
-Local best score works immediately through `localStorage` under `frog.catch.best`.
-
-Public leaderboard calls are isolated in the game script behind `LEADERBOARD_ENABLED = false`. When a backend exists, enable that flag and provide:
+The current atlas settings are:
 
 ```text
-GET  /api/leaderboard?limit=10
-POST /api/score
+frame size: 360 x 360
+columns: 20
+frames: 436
+runtime atlas: sprites/frog_atlas_clean.png
+manifest: sprites/frog_manifest.json
 ```
 
-Score submissions include session id, score, round duration, tap count, hit count, and client version so a tiny backend can reject obviously impossible scores.
+To review frame ranges locally, start the server and open:
 
-## Notes
-
-The game should stay small and design-focused: 30 seconds, blue flies, orange tongue, mono HUD, local best, and no power-ups or heavy app UI.
+```text
+http://127.0.0.1:8765/tools/frame-review.html
+```
