@@ -280,14 +280,13 @@
     const MOBILE_HUD = {
       x: 58,
       y: 54,
-      labelSize: 40,
-      scoreSize: 124,
-      timerSize: 36,
-      scoreX: 190,
-      scoreY: -30,
-      timeY: 78,
-      timerX: 190,
-      timerY: 76,
+      labelSize: 30,
+      scoreSize: 112,
+      timerSize: 26,
+      scoreY: 28,
+      timeY: 150,
+      timerX: 106,
+      timerY: 148,
     };
     const GAME_STATE = { ATTRACT: "attract", PLAYING: "playing", ROUND_OVER: "roundOver" };
     const ROUND = { durationMs: 30000, initialFlyCount: 2, maxFlyCount: 5, addFlyEveryMs: 8000 };
@@ -1018,11 +1017,15 @@
     }
 
     function drawText() {
-      const hud = viewport.portraitStage ? MOBILE_HUD : HUD;
       const score = String(state.score).padStart(2, "0");
       const remaining = state.mode === GAME_STATE.PLAYING
         ? Math.max(0, Math.ceil((state.roundEndsAt - performance.now()) / 1000))
         : 30;
+      if (viewport.portraitStage) {
+        drawMobileHud(score, remaining);
+        return;
+      }
+      const hud = HUD;
       ctx.save();
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
@@ -1036,6 +1039,27 @@
       ctx.fillStyle = COLORS.hudNumber;
       ctx.fillText(score, hud.x + hud.scoreX, hud.y + hud.scoreY);
       ctx.font = mono(700, hud.timerSize);
+      ctx.fillText(String(remaining).padStart(2, "0"), hud.x + hud.timerX, hud.y + hud.timerY);
+      ctx.restore();
+    }
+
+    function drawMobileHud(score, remaining) {
+      const hud = MOBILE_HUD;
+      ctx.save();
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.shadowColor = "rgba(99, 239, 66, 0.24)";
+      ctx.shadowBlur = 7;
+      ctx.font = mono(600, hud.labelSize);
+      ctx.fillStyle = COLORS.hudGreen;
+      ctx.fillText("SCORE", hud.x, hud.y);
+      ctx.font = mono(800, hud.scoreSize);
+      ctx.fillStyle = COLORS.hudNumber;
+      ctx.fillText(score, hud.x, hud.y + hud.scoreY);
+      ctx.font = mono(700, hud.timerSize);
+      ctx.fillStyle = COLORS.hudGreen;
+      ctx.fillText("TIME", hud.x, hud.y + hud.timeY);
+      ctx.fillStyle = COLORS.hudNumber;
       ctx.fillText(String(remaining).padStart(2, "0"), hud.x + hud.timerX, hud.y + hud.timerY);
       ctx.restore();
     }
