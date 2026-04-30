@@ -235,29 +235,24 @@
     };
 
     const defaultFrogManifest = {
-      image: "sprites/frog_atlas.png",
+      image: "sprites/frog_atlas_clean.png",
       frameWidth: 360,
       frameHeight: 360,
       columns: 20,
       frames: 436,
       scale: 1.18,
       mouthOffset: { x: 136, y: 196 },
-      tongueAnchor: { x: 136, y: 254 },
+      tongueAnchor: { x: 136, y: 242 },
       tongueAnchors: {
-        left: { x: 98, y: 248 },
-        right: { x: 174, y: 248 },
-        up: { x: 136, y: 214 },
-        down: { x: 136, y: 270 },
+        left: { x: 98, y: 236 },
+        right: { x: 174, y: 236 },
+        up: { x: 136, y: 202 },
+        down: { x: 136, y: 258 },
       },
       tongueTips: {
         attackLeft: { x: 8, y: 248 },
         attackRight: { x: 310, y: 248 },
         attackUp: { x: 136, y: 34 },
-      },
-      tongueMasks: {
-        attackLeft: { x: 0, y: 224, w: 112, h: 54 },
-        attackRight: { x: 174, y: 224, w: 172, h: 54 },
-        attackUp: { x: 104, y: 30, w: 92, h: 202 },
       },
       eyeGlowAnchors: [{ x: 96, y: 190 }, { x: 176, y: 190 }],
       animations: {
@@ -284,8 +279,6 @@
         scale: 0.82,
       },
     };
-    const maskedFrogFrames = new Map();
-    let pixelTongueMaskUnavailable = false;
     sprites.fly.image.src = "sprites/fly_sheet.png";
 
     function resizeCanvas() {
@@ -697,15 +690,10 @@
       const dh = frogManifest.frameHeight * frogManifest.scale;
       const topLeft = getFrogTopLeft();
       drawEyeGlow(now);
-      const source = state.tongue && state.tongue.useSpriteTongue
-        ? getOrangeMaskedFrogFrame(frame, sx, sy)
-        : sprite.image;
-      const sourceX = source === sprite.image ? sx : 0;
-      const sourceY = source === sprite.image ? sy : 0;
       ctx.drawImage(
-        source,
-        sourceX,
-        sourceY,
+        sprite.image,
+        sx,
+        sy,
         frogManifest.frameWidth,
         frogManifest.frameHeight,
         topLeft.x,
@@ -713,63 +701,6 @@
         dw,
         dh
       );
-      if (pixelTongueMaskUnavailable) maskAuthoredTongueRect();
-    }
-
-    function maskAuthoredTongueRect() {
-      if (!state.tongue || !state.tongue.useSpriteTongue) return;
-      const mask = frogManifest.tongueMasks && frogManifest.tongueMasks[state.tongue.attackName];
-      if (!mask) return;
-      const topLeft = getFrogTopLeft();
-      ctx.save();
-      ctx.fillStyle = COLORS.bg;
-      ctx.shadowColor = "rgba(0, 0, 0, 0.95)";
-      ctx.shadowBlur = 5;
-      ctx.fillRect(
-        topLeft.x + mask.x * frogManifest.scale,
-        topLeft.y + mask.y * frogManifest.scale,
-        mask.w * frogManifest.scale,
-        mask.h * frogManifest.scale
-      );
-      ctx.restore();
-    }
-
-    function getOrangeMaskedFrogFrame(frame, sx, sy) {
-      if (maskedFrogFrames.has(frame)) return maskedFrogFrames.get(frame);
-      const offscreen = document.createElement("canvas");
-      offscreen.width = frogManifest.frameWidth;
-      offscreen.height = frogManifest.frameHeight;
-      const offscreenCtx = offscreen.getContext("2d", { willReadFrequently: true });
-      offscreenCtx.drawImage(
-        sprites.frog.image,
-        sx,
-        sy,
-        frogManifest.frameWidth,
-        frogManifest.frameHeight,
-        0,
-        0,
-        frogManifest.frameWidth,
-        frogManifest.frameHeight
-      );
-      try {
-        const image = offscreenCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-        const data = image.data;
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i];
-          const g = data[i + 1];
-          const b = data[i + 2];
-          const a = data[i + 3];
-          if (a > 12 && r > 145 && g > 45 && g < 185 && b < 90 && r > g * 1.18) {
-            data[i + 3] = 0;
-          }
-        }
-        offscreenCtx.putImageData(image, 0, 0);
-        maskedFrogFrames.set(frame, offscreen);
-        return offscreen;
-      } catch {
-        pixelTongueMaskUnavailable = true;
-        return sprites.frog.image;
-      }
     }
 
     function drawFly(fly, now) {

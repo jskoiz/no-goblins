@@ -1,28 +1,23 @@
 {
   "source": "OpenAI DevDay frog frames derived from froge-loop.riv",
-  "image": "sprites/frog_atlas.png",
+  "image": "sprites/frog_atlas_clean.png",
   "frameWidth": 360,
   "frameHeight": 360,
   "columns": 20,
   "frames": 436,
   "scale": 1.18,
   "mouthOffset": { "x": 136, "y": 196 },
-  "tongueAnchor": { "x": 136, "y": 254 },
+  "tongueAnchor": { "x": 136, "y": 242 },
   "tongueAnchors": {
-    "left": { "x": 98, "y": 248 },
-    "right": { "x": 174, "y": 248 },
-    "up": { "x": 136, "y": 214 },
-    "down": { "x": 136, "y": 270 }
+    "left": { "x": 98, "y": 236 },
+    "right": { "x": 174, "y": 236 },
+    "up": { "x": 136, "y": 202 },
+    "down": { "x": 136, "y": 258 }
   },
   "tongueTips": {
     "attackLeft": { "x": 8, "y": 248 },
     "attackRight": { "x": 310, "y": 248 },
     "attackUp": { "x": 136, "y": 34 }
-  },
-  "tongueMasks": {
-    "attackLeft": { "x": 0, "y": 224, "w": 112, "h": 54 },
-    "attackRight": { "x": 174, "y": 224, "w": 172, "h": 54 },
-    "attackUp": { "x": 104, "y": 30, "w": 92, "h": 202 }
   },
   "eyeGlowAnchors": [
     { "x": 96, "y": 190 },

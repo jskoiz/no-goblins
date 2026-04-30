@@ -21,7 +21,8 @@ The game is a static single-file Canvas 2D runtime. It does not use React, a gam
 ## Main Files
 
 - `frog_minigame.html` - playable browser minigame.
-- `sprites/frog_atlas.png` - 20-column grid atlas for the extracted frog frames.
+- `sprites/frog_atlas.png` - source 20-column grid atlas for the extracted frog frames.
+- `sprites/frog_atlas_clean.png` - runtime atlas with authored orange tongue pixels removed from attack frames.
 - `sprites/frog_manifest.json` - frog frame dimensions, mouth/eye offsets, and animation ranges.
 - `sprites/fly_sheet.png` - two-frame fly sprite sheet.
 - `sprites/rive_frog_frames_deduped/` - deduped source frame sequence used to build the atlas.
@@ -48,7 +49,8 @@ The current browser-safe atlas is a grid rather than a giant horizontal strip:
 frame size: 360 x 360
 columns: 20
 frames: 436
-atlas: sprites/frog_atlas.png
+source atlas: sprites/frog_atlas.png
+runtime atlas: sprites/frog_atlas_clean.png
 manifest: sprites/frog_manifest.json
 ```
 
@@ -58,7 +60,7 @@ Regenerate it from the deduped frame folder with:
 swift make_sprite_atlas.swift
 ```
 
-The older `sprites/frog_sheet.png` remains for reference, but the game prefers `sprites/frog_manifest.json` and `sprites/frog_atlas.png`.
+The older `sprites/frog_sheet.png` remains for reference, but the game prefers `sprites/frog_manifest.json` and `sprites/frog_atlas_clean.png`. The clean atlas lets the canvas-rendered ASCII tongue start at the mouth consistently in `file://`, Helium, and localhost browser modes.
 
 ## Leaderboard
 

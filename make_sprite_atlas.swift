@@ -206,6 +206,59 @@ func makeGridAtlas(crops: [Crop], sourceDir: URL, destination: URL, columns: Int
     CGImageDestinationFinalize(destinationRef)
 }
 
+func writeRGBA(_ pixels: [UInt8], width: Int, height: Int, destination: URL) throws {
+    guard let provider = CGDataProvider(data: Data(pixels) as CFData),
+          let cgImage = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+          ),
+          let destinationRef = CGImageDestinationCreateWithURL(destination as CFURL, UTType.png.identifier as CFString, 1, nil)
+    else {
+        throw NSError(domain: "sprites", code: 5)
+    }
+
+    CGImageDestinationAddImage(destinationRef, cgImage, nil)
+    CGImageDestinationFinalize(destinationRef)
+}
+
+func makeOrangeCleanedAtlas(source: URL, destination: URL, frameWidth: Int, frameHeight: Int, columns: Int, framesToClean: ClosedRange<Int>) throws {
+    var image = try loadRGBA(source)
+    let frames = Set(framesToClean)
+
+    for frame in frames {
+        let column = frame % columns
+        let row = frame / columns
+        let startX = column * frameWidth
+        let startY = row * frameHeight
+
+        for y in startY..<(startY + frameHeight) {
+            for x in startX..<(startX + frameWidth) {
+                guard x >= 0, x < image.width, y >= 0, y < image.height else { continue }
+                let index = y * image.bytesPerRow + x * 4
+                let r = Int(image.pixels[index])
+                let g = Int(image.pixels[index + 1])
+                let b = Int(image.pixels[index + 2])
+                let a = Int(image.pixels[index + 3])
+                let isOrange = a > 8 && r > 135 && g > 35 && g < 195 && b < 115 && r > Int(Double(g) * 1.08) && r > b + 45
+                if isOrange {
+                    image.pixels[index + 3] = 0
+                }
+            }
+        }
+    }
+
+    try writeRGBA(image.pixels, width: image.width, height: image.height, destination: destination)
+}
+
 let frameDir = URL(fileURLWithPath: "frames", isDirectory: true)
 let riveFrameDir = URL(fileURLWithPath: "rive_frames", isDirectory: true)
 let outDir = URL(fileURLWithPath: "sprites", isDirectory: true)
@@ -245,33 +298,36 @@ if hasDedupedFrames {
         columns: 20,
         mode: .frogAndTongue
     )
+    try makeOrangeCleanedAtlas(
+        source: outDir.appendingPathComponent("frog_atlas.png"),
+        destination: outDir.appendingPathComponent("frog_atlas_clean.png"),
+        frameWidth: 360,
+        frameHeight: 360,
+        columns: 20,
+        framesToClean: 26...115
+    )
 
     let frogManifest = """
     {
       "source": "OpenAI DevDay frog frames derived from froge-loop.riv",
-      "image": "sprites/frog_atlas.png",
+      "image": "sprites/frog_atlas_clean.png",
       "frameWidth": 360,
       "frameHeight": 360,
       "columns": 20,
       "frames": \(dedupedFrameNames.count),
       "scale": 1.18,
       "mouthOffset": { "x": 136, "y": 196 },
-      "tongueAnchor": { "x": 136, "y": 254 },
+      "tongueAnchor": { "x": 136, "y": 242 },
       "tongueAnchors": {
-        "left": { "x": 98, "y": 248 },
-        "right": { "x": 174, "y": 248 },
-        "up": { "x": 136, "y": 214 },
-        "down": { "x": 136, "y": 270 }
+        "left": { "x": 98, "y": 236 },
+        "right": { "x": 174, "y": 236 },
+        "up": { "x": 136, "y": 202 },
+        "down": { "x": 136, "y": 258 }
       },
       "tongueTips": {
         "attackLeft": { "x": 8, "y": 248 },
         "attackRight": { "x": 310, "y": 248 },
         "attackUp": { "x": 136, "y": 34 }
-      },
-      "tongueMasks": {
-        "attackLeft": { "x": 0, "y": 224, "w": 112, "h": 54 },
-        "attackRight": { "x": 174, "y": 224, "w": 172, "h": 54 },
-        "attackUp": { "x": 104, "y": 30, "w": 92, "h": 202 }
       },
       "eyeGlowAnchors": [
         { "x": 96, "y": 190 },
@@ -384,5 +440,5 @@ if hasLegacyFrames {
     print("wrote sprites/frog_sheet.png, sprites/fly_sheet.png, sprites/manifest.json")
 }
 if hasDedupedFrames {
-    print("wrote sprites/frog_atlas.png, sprites/frog_manifest.json")
+    print("wrote sprites/frog_atlas.png, sprites/frog_atlas_clean.png, sprites/frog_manifest.json")
 }
