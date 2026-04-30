@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>NO GOBLINS</title>
   <meta name="description" content="NO GOBLINS is a tiny arcade frog game: aim fast, catch flies, and chase a better local score.">
   <meta property="og:type" content="website">
@@ -62,6 +62,7 @@
       --chrome: #0c0c0d;
       --chrome-top: #151516;
       --chrome-line: #252527;
+      --app-height: 100dvh;
     }
 
     * { box-sizing: border-box; }
@@ -69,7 +70,7 @@
     body {
       margin: 0;
       width: 100vw;
-      height: 100vh;
+      height: var(--app-height);
       background: var(--bg);
       color: var(--fg);
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -80,14 +81,14 @@
 
     main {
       width: 100vw;
-      height: 100vh;
+      height: var(--app-height);
       padding: 0;
     }
 
     .stage {
       position: relative;
       width: 100vw;
-      height: 100vh;
+      height: var(--app-height);
       background:
         radial-gradient(circle at 30% 30%, rgb(70 239 58 / 0.035), transparent 28%),
         #000;
@@ -163,11 +164,12 @@
       .footer-ui {
         left: 18px;
         right: 18px;
-        bottom: max(10px, env(safe-area-inset-bottom));
+        bottom: max(16px, calc(env(safe-area-inset-bottom) + 12px));
         align-items: center;
         flex-direction: row;
         gap: 10px;
-        font-size: 10px;
+        font-size: 12px;
+        line-height: 1.05;
       }
 
       .footer-links {
@@ -176,14 +178,14 @@
 
       .stage {
         width: 100vw;
-        height: 100vh;
+        height: var(--app-height);
       }
     }
 
     @media (max-width: 760px) {
       canvas {
         width: 100vw;
-        height: 100vh;
+        height: var(--app-height);
       }
     }
   </style>
@@ -223,7 +225,7 @@
       muted: "#85868c",
       darkGreen: "rgba(99, 239, 66, 0.16)",
     };
-    const HUD = { x: 58, y: 54, labelSize: 15, scoreSize: 34, timerSize: 17 };
+    const HUD = { x: 58, y: 54, labelSize: 15, scoreSize: 42, timerSize: 17 };
     const GAME_STATE = { ATTRACT: "attract", PLAYING: "playing", ROUND_OVER: "roundOver" };
     const ROUND = { durationMs: 30000, initialFlyCount: 2, maxFlyCount: 5, addFlyEveryMs: 8000 };
     const TONGUE = { extendMs: 150, holdMs: 95, retractMs: 155, cooldownMs: 180 };
@@ -240,6 +242,11 @@
       footerReserve: 70,
       portraitStage: false,
     };
+
+    function syncAppHeight() {
+      const height = window.visualViewport?.height || window.innerHeight;
+      document.documentElement.style.setProperty("--app-height", `${Math.round(height)}px`);
+    }
 
     const defaultFrogManifest = {
       image: "sprites/frog_atlas_clean.png",
@@ -289,6 +296,7 @@
     sprites.fly.image.src = "sprites/fly_sheet.png";
 
     function resizeCanvas() {
+      syncAppHeight();
       const rect = canvas.getBoundingClientRect();
       viewport.width = Math.max(1, rect.width);
       viewport.height = Math.max(1, rect.height);
@@ -1112,7 +1120,10 @@
       reset();
       resizeCanvas();
       addEventListener("resize", resizeCanvas);
-      if (window.visualViewport) window.visualViewport.addEventListener("resize", resizeCanvas);
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener("resize", resizeCanvas);
+        window.visualViewport.addEventListener("scroll", resizeCanvas);
+      }
       if (document.fonts?.ready) document.fonts.ready.then(resizeCanvas);
       requestAnimationFrame(frame);
     }
