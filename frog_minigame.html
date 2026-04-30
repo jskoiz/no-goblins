@@ -184,6 +184,7 @@
         <span class="footer-controls">press <span class="accent">r</span> to reset</span>
         <span class="footer-links">
           <a href="https://x.com/jskoiz" target="_blank" rel="noopener noreferrer">by <span class="accent">@jskoiz</span></a>
+          <span aria-hidden="true">/</span>
           <a href="#github">github</a>
         </span>
       </div>
@@ -357,7 +358,7 @@
       state.hitCount = 0;
       state.lastTongueAt = -Infinity;
       setFrogAnimation("idle");
-      spawnFly({ calm: true });
+      ensureFlyCount(ROUND.initialFlyCount);
     }
 
     function groundY() {
@@ -389,11 +390,6 @@
       return Math.max(min, Math.min(max, value));
     }
 
-    function normalizeVector(x, y) {
-      const length = Math.hypot(x, y) || 1;
-      return { x: x / length, y: y / length };
-    }
-
     function spawnFly(options = {}) {
       let x = randomRange(260, VIRTUAL.width - 260);
       let y = randomRange(flyMinY() + 10, flyMaxY());
@@ -405,21 +401,25 @@
         x = randomRange(220, VIRTUAL.width - 220);
         y = randomRange(flyMinY() + 10, flyMaxY());
       }
-      const heading = normalizeVector(randomRange(-1, 1), randomRange(-0.55, 0.55));
       const speed = options.calm ? randomRange(25, 38) : randomRange(45, 85);
+      const axis = Math.random() < 0.65 ? "x" : "y";
+      const sign = Math.random() < 0.5 ? -1 : 1;
       state.flies.push({
         x,
         y,
-        vx: heading.x * speed,
-        vy: heading.y * speed,
+        axis,
+        sign,
+        jitter: 1,
         speed,
-        turnTimer: randomRange(0.45, 1.05),
-        targetVx: heading.x * speed,
-        targetVy: heading.y * speed,
+        turnTimer: randomRange(0.42, 1.05),
         bobPhase: randomRange(0, Math.PI * 2),
         phase: Math.floor(Math.random() * sprites.fly.frames),
         hitRadius: 44,
       });
+    }
+
+    function ensureFlyCount(count, options = {}) {
+      while (state.flies.length < count) spawnFly(options);
     }
 
     function canvasPoint(event) {
@@ -495,8 +495,7 @@
       state.score = 0;
       state.tapCount = 0;
       state.hitCount = 0;
-      state.flies = [];
-      for (let i = 0; i < ROUND.initialFlyCount; i++) spawnFly();
+      ensureFlyCount(ROUND.initialFlyCount);
     }
 
     function saveLocalBest(score) {
@@ -595,33 +594,43 @@
     }
 
     function updateFly(fly, dt) {
+      const difficulty = getDifficulty();
       fly.turnTimer -= dt;
       if (fly.turnTimer <= 0) {
-        const heading = normalizeVector(randomRange(-1, 1), randomRange(-0.7, 0.7));
-        fly.targetVx = heading.x * fly.speed;
-        fly.targetVy = heading.y * fly.speed;
-        fly.turnTimer = randomRange(0.45, 1.2);
+        fly.axis = Math.random() < 0.62 ? "x" : "y";
+        fly.sign = Math.random() < 0.5 ? -1 : 1;
+        fly.jitter = randomRange(0.7 + difficulty * 0.18, 1.2 + difficulty * 1.35);
+        fly.turnTimer = randomRange(
+          Math.max(0.14, 0.42 - difficulty * 0.25),
+          Math.max(0.24, 0.95 - difficulty * 0.58)
+        );
       }
       const minY = flyMinY();
       const maxY = flyMaxY();
-      if (fly.x < 170) fly.targetVx = Math.abs(fly.targetVx);
-      if (fly.x > VIRTUAL.width - 170) fly.targetVx = -Math.abs(fly.targetVx);
-      if (fly.y < minY) fly.targetVy = Math.abs(fly.targetVy);
-      if (fly.y > maxY) fly.targetVy = -Math.abs(fly.targetVy);
+      if (fly.x <= 160) { fly.axis = "x"; fly.sign = 1; }
+      if (fly.x >= VIRTUAL.width - 160) { fly.axis = "x"; fly.sign = -1; }
+      if (fly.y <= minY) { fly.axis = "y"; fly.sign = 1; }
+      if (fly.y >= maxY) { fly.axis = "y"; fly.sign = -1; }
 
-      const steering = 1 - Math.pow(0.035, dt);
-      fly.vx += (fly.targetVx - fly.vx) * steering;
-      fly.vy += (fly.targetVy - fly.vy) * steering;
-      fly.bobPhase += dt * 7.5;
-      fly.x = clamp(fly.x + fly.vx * dt, 160, VIRTUAL.width - 160);
-      fly.y = clamp(fly.y + (fly.vy + Math.sin(fly.bobPhase) * 7) * dt, minY, maxY);
+      const speed = fly.speed * fly.jitter * (1 + difficulty * 1.55);
+      if (fly.axis === "x") {
+        fly.x = clamp(fly.x + fly.sign * speed * dt, 160, VIRTUAL.width - 160);
+      } else {
+        fly.y = clamp(fly.y + fly.sign * speed * dt, minY, maxY);
+      }
+    }
+
+    function getDifficulty() {
+      if (state.mode !== GAME_STATE.PLAYING || state.roundEndsAt <= state.roundStartedAt) return 0;
+      const elapsed = performance.now() - state.roundStartedAt;
+      return Math.pow(clamp(elapsed / ROUND.durationMs, 0, 1), 0.58);
     }
 
     function update(dt, now) {
       updateFrogAnimation(dt);
       if (state.mode === GAME_STATE.ATTRACT) {
         for (const fly of state.flies) {
-          if (fly !== state.tongue?.target) updateFly(fly, dt * 0.45);
+          if (fly !== state.tongue?.target) updateFly(fly, dt);
         }
       }
       if (state.mode === GAME_STATE.PLAYING) {
@@ -1006,22 +1015,19 @@
     function drawRoundOver() {
       if (state.mode !== GAME_STATE.ROUND_OVER) return;
       ctx.save();
-      ctx.fillStyle = "rgba(0, 0, 0, 0.66)";
-      ctx.fillRect(0, 0, VIRTUAL.width, viewport.virtualHeight);
-      ctx.fillStyle = "rgba(50, 152, 255, 0.08)";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.74)";
       ctx.fillRect(0, 0, VIRTUAL.width, viewport.virtualHeight);
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.font = mono(900, 34);
-      ctx.fillStyle = COLORS.blue;
-      ctx.shadowColor = "rgba(50, 152, 255, 0.55)";
-      ctx.shadowBlur = 12;
-      ctx.fillText(`SCORE ${String(state.score).padStart(2, "0")}`, VIRTUAL.width / 2, 238);
-      ctx.shadowBlur = 0;
-      ctx.font = mono(800, 16);
       ctx.fillStyle = COLORS.frog;
+      ctx.shadowColor = "rgba(99, 239, 66, 0.52)";
+      ctx.shadowBlur = 10;
+      ctx.fillText(`SCORE ${String(state.score).padStart(2, "0")}`, VIRTUAL.width / 2, 238);
+      ctx.font = mono(800, 16);
       ctx.fillText(`BEST ${String(state.localBest).padStart(2, "0")}`, VIRTUAL.width / 2, 278);
-      ctx.fillStyle = COLORS.muted;
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = COLORS.frog;
       ctx.fillText("press r to reset", VIRTUAL.width / 2, 310);
       ctx.restore();
     }
