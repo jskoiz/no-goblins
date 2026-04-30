@@ -45,7 +45,7 @@ Useful files:
 - `sprites/rive_frog_frames_deduped/` - unique sampled source frames used for the atlas.
 - `sprites/fly_sheet.png` - two-frame fly sprite sheet.
 - `tools/frame-review.html` - local frame scrubber for checking and tuning animation ranges.
-- `assets/favicon.svg`, `assets/og-no-goblins.png` - public metadata assets.
+- `assets/favicon.png`, `assets/og-no-goblins.png` - public metadata assets.
 
 ## Regenerate The Atlas
 
