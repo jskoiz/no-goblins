@@ -1,0 +1,18 @@
+{
+  "source": "OpenAI DevDay frog/fly recording frames derived from froge-loop.riv",
+  "frog": {
+    "image": "sprites/frog_sheet.png",
+    "frameWidth": 360,
+    "frameHeight": 220,
+    "frames": 24,
+    "crop": { "x": 450, "y": 500, "width": 360, "height": 220 },
+    "mouthOffset": { "x": 190, "y": 103 },
+    "scale": 0.6
+  },
+  "fly": {
+    "image": "sprites/fly_sheet.png",
+    "frameWidth": 150,
+    "frameHeight": 90,
+    "frames": 2
+  }
+}
